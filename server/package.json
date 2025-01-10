@@ -3,14 +3,14 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/server.ts"
+  },
+  "dependencies": {
+    "elysia": "latest",
+    "puppeteer": "^24.0.0"
   },
   "devDependencies": {
     "bun-types": "latest"
   },
-  "module": "src/index.js",
-  "dependencies": {
-    "@trpc/client": "^11.0.0-rc.688",
-    "@trpc/server": "^11.0.0-rc.688"
-  }
+  "module": "src/index.js"
 }
