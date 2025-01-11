@@ -1,4 +1,5 @@
 import { Page } from 'puppeteer';
+import path from 'path';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -16,4 +17,11 @@ export function disableAnimation(page: Page) {
 
     page.addStyleTag({ content });
   });
+}
+
+export async function getLocalStorage() {
+  const filePath = path.resolve(__dirname, '../../creds/localStorage.json');
+  const file = Bun.file(filePath);
+  const ls = await file.json() ?? null;
+  return ls as Record<string, string> | null;
 }

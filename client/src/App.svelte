@@ -1,6 +1,13 @@
 <script lang="ts">
   async function login() {
-    await fetch('http://localhost:3000/login');
+    try {
+      const request = await fetch('http://localhost:3000/login');
+      if (!request.ok) {
+        alert(505)
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unknown error.")
+    }
   }
 </script>
 

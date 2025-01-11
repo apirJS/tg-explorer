@@ -1,10 +1,13 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL } from '../lib/const';
+import { getLocalStorage } from '../lib';
 
 class Scraper {
   private static instance: Scraper;
   private browser!: Browser;
   private currentPage?: Page;
+  public cookies?: string[];
+  public localStorage?: Record<string, any>;
 
   private constructor() {}
 
@@ -28,6 +31,14 @@ class Scraper {
     return this.currentPage;
   }
 
+  async openTelegram() {
+    if (!this.currentPage) {
+      this.currentPage = await this.getPage();
+    }
+
+    await this.currentPage.goto(BASE_TELEGRAM_URL);
+  }
+
   async close() {
     await this.browser.close();
   }
@@ -37,22 +48,55 @@ class Scraper {
       this.currentPage = await this.getPage();
     }
 
-    await this.currentPage.goto(BASE_TELEGRAM_URL);
-    this.currentPage.on('response', async (response) => {
-      const headers = response.headers();
-      if (headers['set-cookie']) {
-        console.log('Set-Cookie header detected:', headers['set-cookie']);
-        console.log(await this.currentPage?.cookies());
+    this.currentPage.on('request', async (request) => {
+      const url = request.url();
+      if (url.includes('avatar') && url.endsWith('.js')) {
+        this.localStorage = await this.currentPage?.evaluate(() => {
+          const data: Record<string, string> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+              data[key] = localStorage.getItem(key) || '';
+            }
+          }
+          return data;
+        });
       }
     });
+  }
 
-    const interval = setInterval(async () => {
-      console.log(await this.browser.cookies());
-    }, 1000);
+  async loadCredentials() {
+    if (!this.currentPage) {
+      this.currentPage = await this.getPage();
+    }
 
-    setTimeout(() => {
-      clearInterval(interval);
-    }, 30_000);
+    const ls = await getLocalStorage();
+    if (ls === null) {
+      return await this.getCredentials();
+    }
+
+    this.localStorage = ls;
+    this.currentPage.waitForSelector(
+      '#auth-pages > div > div.tabs-container.auth-pages__container > div.tabs-tab.page-signQR.active > div > div.auth-image > canvas'
+    );
+
+    await this.currentPage.evaluate(() => {
+      for (const [key, value] of Object.entries(ls)) {
+        console.log('Setting localStorage...');
+        console.log(key, value);
+        console.log(ls);
+        localStorage.setItem(key, value);
+      }
+    });
+  }
+
+  async capturePage() {
+    if (!this.currentPage) {
+      this.currentPage = await this.getPage();
+    }
+
+    await this.currentPage.waitForNetworkIdle();
+    await this.currentPage.screenshot({ path: 'assets/telegram.png' });
   }
 }
 
