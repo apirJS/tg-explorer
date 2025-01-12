@@ -1,16 +1,37 @@
 <script lang="ts">
-  async function login() {
-    try {
-      const request = await fetch('http://localhost:3000/login');
-      if (!request.ok) {
-        alert(505)
-      }
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Unknown error.")
+  import { onMount } from 'svelte';
+
+  let message = $state('');
+  let ws: WebSocket | null = null;
+
+  onMount(() => {
+    ws = new WebSocket('ws://localhost:3000/ws');
+    ws.addEventListener('open', () => {
+      alert('connected');
+    });
+
+    ws.addEventListener('message', (event) => {
+      alert(event.data);
+    });
+
+    return () => {
+      ws?.close();
+    };
+  });
+
+  function sendMessage(event: SubmitEvent) {
+    event.preventDefault();
+    if (ws) {
+      ws.send(message);
+    } else {
+      alert('Not connected');
     }
   }
 </script>
 
 <main class="grid place-items-center min-h-screen">
-  <button onclick={login} aria-label="login">Login</button>
+  <form onsubmit={sendMessage}>
+    <input type="text" placeholder="Enter your name" bind:value={message} />
+    <button type="submit">Submit</button>
+  </form>
 </main>

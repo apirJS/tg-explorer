@@ -76,10 +76,7 @@ class Scraper {
     }
 
     this.localStorage = ls;
-    this.currentPage.waitForSelector(
-      '#auth-pages > div > div.tabs-container.auth-pages__container > div.tabs-tab.page-signQR.active > div > div.auth-image > canvas'
-    );
-
+    await this.currentPage.waitForNetworkIdle({ idleTime: 10_000 });
     await this.currentPage.evaluate(() => {
       for (const [key, value] of Object.entries(ls)) {
         console.log('Setting localStorage...');
@@ -95,7 +92,7 @@ class Scraper {
       this.currentPage = await this.getPage();
     }
 
-    await this.currentPage.waitForNetworkIdle();
+    await this.currentPage.waitForNetworkIdle({ idleTime: 10_000 });
     await this.currentPage.screenshot({ path: 'assets/telegram.png' });
   }
 }
