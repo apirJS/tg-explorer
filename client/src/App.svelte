@@ -27,6 +27,10 @@
       alert('Not connected');
     }
   }
+
+  async function getCredentials() {
+    const response = await fetch('http://localhost:3000/credentials');
+  }
 </script>
 
 <main class="grid place-items-center min-h-screen">
@@ -34,4 +38,5 @@
     <input type="text" placeholder="Enter your name" bind:value={message} />
     <button type="submit">Submit</button>
   </form>
+  <button onclick={getCredentials}>Get Credentials</button>
 </main>

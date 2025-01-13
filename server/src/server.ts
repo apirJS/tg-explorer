@@ -7,15 +7,15 @@ const app = new Elysia()
   .state('scraper', await Scraper.getInstance({ headless: false }))
   .ws('/ws', {
     message(ws, message) {
-      console.log("Received: " + message);
-      ws.send("You send me: " + message);
-    }
+      console.log('Received: ' + message);
+      ws.send('You send me: ' + message);
+    },
   })
-  .get('/login', async ({ store: { scraper }, set }) => {
+  .get('/credentials', async ({ store: { scraper }, set }) => {
     await scraper.getPage();
     await scraper.openTelegram();
     await scraper.getCredentials();
-    
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         set.status = 'Request Timeout';
@@ -40,7 +40,7 @@ const app = new Elysia()
       checkLocalStorage();
     });
   })
-  .listen(3000, () => {
+  .listen({ idleTimeout: 120, port: 3000 }, () => {
     console.log('Server listening on http://localhost:3000');
   });
 
@@ -49,5 +49,3 @@ process.on('SIGINT', async () => {
   await scraper.close();
   process.exit();
 });
-
-export default app;
