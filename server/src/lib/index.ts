@@ -19,9 +19,3 @@ export function disableAnimation(page: Page) {
   });
 }
 
-export async function getLocalStorage() {
-  const filePath = path.resolve(__dirname, '../../creds/localStorage.json');
-  const file = Bun.file(filePath);
-  const ls = await file.json() ?? null;
-  return ls as Record<string, string> | null;
-}

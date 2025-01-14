@@ -1,6 +1,6 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL } from '../lib/const';
-import { getLocalStorage } from '../lib';
+import path from 'path';
 
 class Scraper {
   private static instance: Scraper;
@@ -19,11 +19,12 @@ class Scraper {
     return Scraper.instance;
   }
 
-  async init(options?: LaunchOptions) {
+  private async init(options?: LaunchOptions) {
     this.browser = await puppeteer.launch(options);
+    await this.getPage();
   }
 
-  async getPage(): Promise<Page> {
+  private async getPage(): Promise<Page> {
     if (!this.currentPage) {
       const [page] = await this.browser.pages();
       this.currentPage = page ?? (await this.browser.newPage());
@@ -32,68 +33,69 @@ class Scraper {
   }
 
   async openTelegram() {
-    if (!this.currentPage) {
-      this.currentPage = await this.getPage();
-    }
-
-    await this.currentPage.goto(BASE_TELEGRAM_URL);
+    const page = await this.getPage();
+    await page.goto(BASE_TELEGRAM_URL);
   }
 
   async close() {
     await this.browser.close();
   }
 
-  async getCredentials() {
-    if (!this.currentPage) {
-      this.currentPage = await this.getPage();
-    }
+  private async captureLocalStorage() {
+    const page = await this.getPage();
+    this.localStorage = await page.evaluate(() => {
+      const data: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          data[key] = localStorage.getItem(key) || '';
+        }
+      }
+      return data;
+    });
+    await Bun.write('localStorage.json', JSON.stringify(this.localStorage));
+  }
 
-    this.currentPage.on('request', async (request) => {
-      const url = request.url();
-      if (url.includes('avatar') && url.endsWith('.js')) {
-        this.localStorage = await this.currentPage?.evaluate(() => {
-          const data: Record<string, string> = {};
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key) {
-              data[key] = localStorage.getItem(key) || '';
-            }
-          }
-          return data;
-        });
+  async getCredentials() {
+    const page = await this.getPage();
+    page.on('request', async (request) => {
+      const url = new URL(request.url());
+      const path = url.pathname;
+      const authed = Boolean(url.searchParams.get('authed')) ?? false;
+      if (path === '/_websync_' && authed) {
+        await this.captureLocalStorage();
       }
     });
+  }
+
+  async getLocalStorage() {
+    const filePath = path.resolve(__dirname, '../../creds/localStorage.json');
+    const file = Bun.file(filePath);
+    const ls = (await file.json()) ?? null;
+    return ls as Record<string, string> | null;
   }
 
   async loadCredentials() {
-    if (!this.currentPage) {
-      this.currentPage = await this.getPage();
-    }
+    const page = await this.getPage();
+    const ls = await this.getLocalStorage();
 
-    const ls = await getLocalStorage();
     if (ls === null) {
-      return await this.getCredentials();
+      await this.getCredentials();
+    } else {
+      this.localStorage = ls;
+      await page.evaluate((localStorageData) => {
+        for (const [key, value] of Object.entries(localStorageData)) {
+          localStorage.setItem(key, value);
+        }
+      }, ls);
+      await page.reload();
     }
-
-    this.localStorage = ls;
-    await this.currentPage.waitForNetworkIdle({ idleTime: 10_000 });
-    await this.currentPage.evaluate(() => {
-      for (const [key, value] of Object.entries(ls)) {
-        console.log('Setting localStorage...');
-        console.log(key, value);
-        console.log(ls);
-        localStorage.setItem(key, value);
-      }
-    });
   }
 
   async capturePage() {
-    if (!this.currentPage) {
-      this.currentPage = await this.getPage();
-    }
-
-    await this.currentPage.waitForNetworkIdle({ idleTime: 10_000 });
-    await this.currentPage.screenshot({ path: 'assets/telegram.png' });
+    const page = await this.getPage();
+    await page.waitForNetworkIdle({ idleTime: 10_000 });
+    await page.screenshot({ path: 'assets/telegram.png' });
   }
 }
 
