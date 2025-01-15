@@ -1,17 +1,21 @@
 import { Elysia } from 'elysia';
 import Scraper from './scraper';
 import { cors } from '@elysiajs/cors';
-import { WSMessage } from './lib/types';
+import path from 'path';
 
 const app = new Elysia()
   .use(cors({ origin: 'http://localhost:5173' }))
   .ws('/ws', {
     async open() {
-      const scraper = await Scraper.getInstance({ headless: false });
-      await scraper.openTelegram();
-      await scraper.loadCredentials();
+      const scraper = await Scraper.getInstance({
+        headless: false,
+        userDataDir: path.resolve(__dirname, '../session'),
+      });
+      const authed = await scraper.isUserAuthenticated();
+      if (!authed) {
+        await scraper.openTelegram();
+      }
     },
-    message(ws, message) {},
   })
   .listen({ idleTimeout: 120, port: 3000 }, () => {
     console.log('Server listening on http://localhost:3000');

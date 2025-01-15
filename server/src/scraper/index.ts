@@ -97,6 +97,16 @@ class Scraper {
     await page.waitForNetworkIdle({ idleTime: 10_000 });
     await page.screenshot({ path: 'assets/telegram.png' });
   }
+
+  async isUserAuthenticated(): Promise<boolean> {
+    const page = await this.getPage();
+    await page.goto(BASE_TELEGRAM_URL);
+    const authenticated: boolean = await page.evaluate(() => {
+      const element = document.getElementById('Main');
+      return element !== null;
+    });
+    return authenticated;
+  }
 }
 
 export default Scraper;

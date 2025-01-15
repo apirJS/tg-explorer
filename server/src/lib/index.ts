@@ -1,5 +1,6 @@
 import { Page } from 'puppeteer';
 import path from 'path';
+import fs from 'fs';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -19,3 +20,7 @@ export function disableAnimation(page: Page) {
   });
 }
 
+export function isSessionFolderExists(): boolean {
+  const folder = path.resolve(__dirname, '../../session');
+  return fs.existsSync(folder);
+}
