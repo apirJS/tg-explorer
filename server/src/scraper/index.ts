@@ -99,13 +99,21 @@ class Scraper {
   }
 
   async isUserAuthenticated(): Promise<boolean> {
-    const page = await this.getPage();
+    const page = await this.browser.newPage();
     await page.goto(BASE_TELEGRAM_URL);
+    await page.waitForSelector('#Main');
     const authenticated: boolean = await page.evaluate(() => {
       const element = document.getElementById('Main');
-      return element !== null;
+      return !!element;
     });
+    // await page.close();
     return authenticated;
+  }
+
+  async relaunch(options: LaunchOptions) {
+    await this.browser.close();
+    this.browser = await puppeteer.launch(options);
+    this.currentPage = await this.getPage();
   }
 }
 
