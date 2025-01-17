@@ -98,6 +98,10 @@ class Scraper {
     await page.screenshot({ path: 'assets/telegram.png' });
   }
 
+  async getUsername() {
+    
+  }
+
   async isUserAuthenticated(): Promise<boolean> {
     const page = await this.browser.newPage();
     await page.goto(BASE_TELEGRAM_URL);

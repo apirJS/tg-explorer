@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   let loading = $state(false);
   let username = $state('');
-  let error = $state('');
+  let error = $state<null | string>(null);
 
   async function login() {
     loading = true;
@@ -9,12 +10,23 @@
       const response = await fetch('http://localhost:3000/login');
       const data = await response.json();
       username = data.data.username;
-    } catch (error) {
-      error = error instanceof Error ? error.message : 'Unknown error.';
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unknown error.';
+      setTimeout(() => {
+        error = null;
+      }, 3000);
     } finally {
       loading = false;
     }
   }
+
+  onMount(() => {
+    const ws = new WebSocket('http://localhost:3000/ws');
+    ws.addEventListener('error', (err) => {
+      error =
+        err instanceof Error ? err.message : 'WebSocket failed to connect.';
+    });
+  });
 </script>
 
 <main class="grid place-items-center min-h-screen">
@@ -25,10 +37,11 @@
     >
     {#if loading}
       <p>Loading...</p>
-    {:else if error}
-      <p>{error}</p>
     {:else if username}
-      <p>Welcome, {username}!</p>
+      <p>Welcome {username}</p>
+    {/if}
+    {#if error}
+      <p>error: {error}</p>
     {/if}
   </div>
 </main>

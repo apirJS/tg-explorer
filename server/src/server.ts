@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia';
+import { Elysia, error } from 'elysia';
 import Scraper from './scraper';
 import { cors } from '@elysiajs/cors';
 import path from 'path';
@@ -16,18 +16,17 @@ const app = new Elysia()
   .onBeforeHandle(async ({ store }) => {
     store.authed = await store.scraper.isUserAuthenticated();
   })
+  .ws('/ws', {
+    message(ws, message) {},
+  })
   .get(
     '/login',
     async ({ store: { scraper, authed }, set }) => {
-      if (authed) {
-        await scraper.openTelegram();
-        set.status = 'OK';
-        return {
-          data: {
-            username: 'John',
-          },
-        };
+      if (!authed) {
+        return error('Unauthorized');
       }
+
+      
     },
     {}
   )
