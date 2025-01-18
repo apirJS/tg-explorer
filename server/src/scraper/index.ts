@@ -110,7 +110,7 @@ class Scraper {
       const element = document.getElementById('Main');
       return !!element;
     });
-    // await page.close();
+    await page.close();
     return authenticated;
   }
 
