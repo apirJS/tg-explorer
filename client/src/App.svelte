@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { WSMessage } from './lib/types';
+  import ErrorModal from './components/error-modal.svelte';
   let loading = $state<boolean>(false);
   let username = $state<string | null>(null);
   let error = $state<null | string>(null);
@@ -53,13 +54,17 @@
   });
 
   function isWebSocketReady() {
-    return ws && ws.readyState !== WebSocket.CLOSED;
+    return (
+      ws &&
+      ws.readyState !== WebSocket.CLOSED &&
+      ws.readyState !== WebSocket.CONNECTING
+    );
   }
 </script>
 
 <main class="grid place-items-center min-h-screen">
   {#if !isWebSocketReady()}
-    <p>WebSocket is not connected</p>
+    <ErrorModal error={new Error('WebSocket isdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd not connected.')} />
   {:else}
     <div class="flex flex-col w-60 h-60 justify-center items-center p-4">
       <button
