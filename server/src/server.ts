@@ -10,8 +10,8 @@ const app = new Elysia()
   .state(
     'scraper',
     await initializeScraper({
-      headless: true,
-      userDataDir: path.resolve(__dirname, '../sessions'),
+      headless: false,
+      userDataDir: path.resolve(__dirname, '../session'),
     })
   )
   .ws('/ws', {
@@ -20,8 +20,7 @@ const app = new Elysia()
     },
     message(ws, msg: WSMessage) {
       switch (msg.type) {
-        case "get_creds":
-          
+        case 'get_creds':
       }
     },
   })
@@ -31,7 +30,15 @@ const app = new Elysia()
       return error('Unauthorized', { message: 'User not authenticated' });
     }
   })
-  .get('/login', async ({ store: { scraper }, set }) => {})
+  .get('/login', async ({ store: { scraper }, set }) => {
+    const username = await scraper.getUsername();
+    set.status = 'OK';
+    return {
+      data: {
+        username,
+      },
+    };
+  })
   .listen({ idleTimeout: 120, port: 3000 }, () => {
     console.log('Server listening on http://localhost:3000');
   });

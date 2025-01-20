@@ -1,6 +1,7 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL } from '../lib/const';
 import path from 'path';
+import selectors from '../lib/selectors';
 
 class Scraper {
   private static instance: Scraper;
@@ -98,10 +99,6 @@ class Scraper {
     await page.screenshot({ path: 'assets/telegram.png' });
   }
 
-  async getUsername() {
-    
-  }
-
   async isUserAuthenticated(): Promise<boolean> {
     const page = await this.browser.newPage();
     await page.goto(BASE_TELEGRAM_URL);
@@ -118,6 +115,20 @@ class Scraper {
     await this.browser.close();
     this.browser = await puppeteer.launch(options);
     this.currentPage = await this.getPage();
+  }
+
+  async getUsername() {
+    const page = await this.getPage();
+    console.log(selectors);
+    (await page.$(selectors.HAMBURGER_MENU.value))?.click();
+    (
+      await page.$(selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value)
+    )?.click();
+    const username = await page.evaluate((query) => {
+      const element = document.querySelector(query);
+      return element ? element.innerHTML : null;
+    }, selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value);
+    return username;
   }
 }
 

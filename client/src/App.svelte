@@ -4,15 +4,16 @@
   import ErrorModal from './components/error-modal.svelte';
   let loading = $state<boolean>(false);
   let username = $state<string | null>(null);
-  let error = $state<null | string>(null);
+  let error = $state<Error | unknown | null>(null);
   let ws = $state<WebSocket | null>(null);
+  let webSocketError = $state<boolean>(false);
 
   async function login() {
     loading = true;
     try {
       const response = await fetch('http://localhost:3000/login');
       if (!response.ok) {
-        error = 'Failed to login.';
+        error = new Error('Failed to login.');
         const msg: WSMessage = {
           type: 'get_creds',
         };
@@ -23,7 +24,7 @@
       const data = await response.json();
       username = data.data.username;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Server error.';
+      error = err;
       setTimeout(() => {
         error = null;
       }, 3000);
@@ -40,38 +41,37 @@
     });
 
     ws.addEventListener('close', () => {
-      setTimeout(connectWebSocket, 5000);
+      connectWebSocket();
     });
 
     ws.addEventListener('error', (err) => {
-      error =
-        err instanceof Error ? err.message : 'WebSocket failed to connect.';
+      webSocketError = true;
+      error = err;
     });
   }
 
   onMount(() => {
     connectWebSocket();
   });
-
-  function isWebSocketReady() {
-    return (
-      ws &&
-      ws.readyState !== WebSocket.CLOSED &&
-      ws.readyState !== WebSocket.CONNECTING
-    );
-  }
 </script>
 
 <main class="grid place-items-center min-h-screen">
-  {#if !isWebSocketReady()}
-    <ErrorModal error={new Error('WebSocket isdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd not connected.')} />
+  {#if webSocketError}
+    <ErrorModal
+      error={new Error('WebSocket is not connected!')}
+      refreshOnClose={true}
+    />
   {:else}
     <div class="flex flex-col w-60 h-60 justify-center items-center p-4">
-      <button
-        onclick={login}
-        class="w-20 text-lg bg-none rounded border border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
-        >Login</button
-      >
+      {#if !username}
+        <button
+          onclick={login}
+          class="w-20 text-lg bg-none rounded border border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
+          >Login</button
+        >
+      {:else}
+        <p>Welcome {username}</p>
+      {/if}
     </div>
   {/if}
 </main>
