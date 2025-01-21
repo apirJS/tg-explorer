@@ -7,9 +7,17 @@
   let error = $state<Error | unknown | null>(null);
   let ws = $state<WebSocket | null>(null);
   let webSocketError = $state<boolean>(false);
+  let dots = $state<string>('');
+  let intervalId: number | undefined = undefined;
+
+  onMount(() => {
+    connectWebSocket();
+    login();
+  });
 
   async function login() {
     loading = true;
+    animateDots();
     try {
       const response = await fetch('http://localhost:3000/login');
       if (!response.ok) {
@@ -30,6 +38,7 @@
       }, 3000);
     } finally {
       loading = false;
+      clearInterval(intervalId);
     }
   }
 
@@ -50,9 +59,19 @@
     });
   }
 
-  onMount(() => {
-    connectWebSocket();
-  });
+  function animateDots() {
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+
+    let speed = 300;
+    let len = 1;
+
+    intervalId = setInterval(() => {
+      dots = '.'.repeat(len);
+      len = len === 3 ? 0 : len + 1;
+    }, speed);
+  }
 </script>
 
 <main class="grid place-items-center min-h-screen">
@@ -62,15 +81,24 @@
       refreshOnClose={true}
     />
   {:else}
-    <div class="flex flex-col w-60 h-60 justify-center items-center p-4">
+    <div
+      class="flex flex-col w-60 h-40 justify-center items-center p-4 relative"
+    >
       {#if !username}
         <button
+          disabled={loading}
           onclick={login}
-          class="w-20 text-lg bg-none rounded border border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
+          class="[] disabled:opacity-70 disabled:hover:border-blue-300/50 w-20 text-lg bg-none rounded border-2 border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
           >Login</button
         >
+      {:else if error}
+        <ErrorModal {error} />
       {:else}
-        <p>Welcome {username}</p>
+        <span>Welcome {username}</span>
+      {/if}
+
+      {#if loading}
+        <span class="absolute bottom-5">loading{dots}</span>
       {/if}
     </div>
   {/if}

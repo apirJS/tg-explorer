@@ -1,4 +1,9 @@
-import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
+import puppeteer, {
+  Browser,
+  ElementHandle,
+  LaunchOptions,
+  Page,
+} from 'puppeteer';
 import { BASE_TELEGRAM_URL } from '../lib/const';
 import path from 'path';
 import selectors from '../lib/selectors';
@@ -28,14 +33,14 @@ class Scraper {
   private async getPage(): Promise<Page> {
     if (!this.currentPage) {
       const [page] = await this.browser.pages();
-      this.currentPage = page ?? (await this.browser.newPage());
+      this.currentPage = page || (await this.browser.newPage());
     }
     return this.currentPage;
   }
 
-  async openTelegram() {
+  async openTelegram(type: 'a' | 'k' = 'a') {
     const page = await this.getPage();
-    await page.goto(BASE_TELEGRAM_URL);
+    await page.goto(BASE_TELEGRAM_URL + type + '/');
   }
 
   async close() {
@@ -101,7 +106,7 @@ class Scraper {
 
   async isUserAuthenticated(): Promise<boolean> {
     const page = await this.browser.newPage();
-    await page.goto(BASE_TELEGRAM_URL);
+    await page.goto(BASE_TELEGRAM_URL + 'a/');
     await page.waitForSelector('#Main');
     const authenticated: boolean = await page.evaluate(() => {
       const element = document.getElementById('Main');
@@ -119,15 +124,26 @@ class Scraper {
 
   async getUsername() {
     const page = await this.getPage();
-    console.log(selectors);
-    (await page.$(selectors.HAMBURGER_MENU.value))?.click();
-    (
-      await page.$(selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value)
-    )?.click();
+    await this.openTelegram();
+
+    await page.waitForSelector(
+      selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value
+    );
+
+    await page.evaluate((query) => {
+      const e: HTMLDivElement | null = document.querySelector(query);
+      e?.click();
+    }, selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value);
+
+    await page.waitForSelector(
+      selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value
+    );
+
     const username = await page.evaluate((query) => {
       const element = document.querySelector(query);
       return element ? element.innerHTML : null;
     }, selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value);
+
     return username;
   }
 }

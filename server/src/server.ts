@@ -5,15 +5,13 @@ import path from 'path';
 import Scraper from './scraper';
 import { WSMessage } from './lib/types';
 
-const app = new Elysia()
+const scraper = await initializeScraper({
+  headless: true,
+  userDataDir: path.resolve(__dirname, '../session'),
+});
+
+new Elysia()
   .use(cors({ origin: 'http://localhost:5173' }))
-  .state(
-    'scraper',
-    await initializeScraper({
-      headless: false,
-      userDataDir: path.resolve(__dirname, '../session'),
-    })
-  )
   .ws('/ws', {
     open(ws) {
       console.log('WS connected: ', ws.id);
@@ -21,16 +19,16 @@ const app = new Elysia()
     message(ws, msg: WSMessage) {
       switch (msg.type) {
         case 'get_creds':
+        //
       }
     },
   })
-  .onBeforeHandle(async ({ store }) => {
-    const authed = await store.scraper.isUserAuthenticated();
-    if (!authed) {
-      return error('Unauthorized', { message: 'User not authenticated' });
+  .get('/login', async ({ set }) => {
+    const authenticated = await scraper.isUserAuthenticated();
+    if (!authenticated) {
+      return error('Unauthorized', { message: 'User is not authenticated.' });
     }
-  })
-  .get('/login', async ({ store: { scraper }, set }) => {
+
     const username = await scraper.getUsername();
     set.status = 'OK';
     return {
