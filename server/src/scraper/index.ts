@@ -1,9 +1,4 @@
-import puppeteer, {
-  Browser,
-  ElementHandle,
-  LaunchOptions,
-  Page,
-} from 'puppeteer';
+import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL } from '../lib/const';
 import path from 'path';
 import selectors from '../lib/selectors';
@@ -40,7 +35,7 @@ class Scraper {
 
   async openTelegram(type: 'a' | 'k' = 'a') {
     const page = await this.getPage();
-    await page.goto(BASE_TELEGRAM_URL + type + '/');
+    await page.goto(`${BASE_TELEGRAM_URL}${type}/`);
   }
 
   async close() {
@@ -66,9 +61,7 @@ class Scraper {
     const page = await this.getPage();
     page.on('request', async (request) => {
       const url = new URL(request.url());
-      const path = url.pathname;
-      const authed = Boolean(url.searchParams.get('authed')) ?? false;
-      if (path === '/_websync_' && authed) {
+      if (url.pathname === '/_websync_' && url.searchParams.get('authed')) {
         await this.captureLocalStorage();
       }
     });
@@ -106,12 +99,11 @@ class Scraper {
 
   async isUserAuthenticated(): Promise<boolean> {
     const page = await this.browser.newPage();
-    await page.goto(BASE_TELEGRAM_URL + 'a/');
+    await page.goto(`${BASE_TELEGRAM_URL}a/`);
     await page.waitForSelector('#Main');
-    const authenticated: boolean = await page.evaluate(() => {
-      const element = document.getElementById('Main');
-      return !!element;
-    });
+    const authenticated = await page.evaluate(
+      () => !!document.getElementById('Main')
+    );
     await page.close();
     return authenticated;
   }
@@ -129,7 +121,6 @@ class Scraper {
     await page.waitForSelector(
       selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value
     );
-
     await page.evaluate((query) => {
       const e: HTMLDivElement | null = document.querySelector(query);
       e?.click();
@@ -138,13 +129,79 @@ class Scraper {
     await page.waitForSelector(
       selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value
     );
-
     const username = await page.evaluate((query) => {
-      const element = document.querySelector(query);
+      const element: HTMLHeadingElement | null = document.querySelector(query);
       return element ? element.innerHTML : null;
     }, selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value);
 
     return username;
+  }
+
+  async getUserId() {
+    const page = await this.getPage();
+    const userId = await page.evaluate(() => {
+      const data = localStorage.getItem('user_auth');
+      return data ? JSON.parse(data).id : 'unknown';
+    });
+    return userId;
+  }
+
+  async isChannelExists() {
+    const page = await this.getPage();
+    return !!(await page.evaluate(() => {
+      return localStorage.getItem('tg-explorer-channel-url');
+    }));
+  }
+
+  async createChannel(userId: string) {
+    const page = await this.getPage();
+
+    await page.waitForSelector(selectors.NEW_CHANNEL_BUTTON.value);
+    await page.evaluate((query) => {
+      const newChannelButton = document.querySelector(query) as HTMLDivElement;
+      if (newChannelButton) {
+        newChannelButton.click();
+      }
+    }, selectors.NEW_CHANNEL_BUTTON.value);
+
+    await page.waitForSelector(
+      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value
+    );
+    await page.evaluate((query) => {
+      const newChannelButton = document.querySelector(
+        query
+      ) as HTMLButtonElement;
+      if (newChannelButton) {
+        newChannelButton.click();
+      }
+    }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value);
+
+    await page.waitForSelector(
+      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
+        .value
+    );
+    await page.type(
+      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
+        .value,
+      userId
+    );
+
+    await page.waitForSelector(
+      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON
+        .value
+    );
+    await page.evaluate((query) => {
+      const newChannelButton = document.querySelector(
+        query
+      ) as HTMLButtonElement;
+      if (newChannelButton) {
+        newChannelButton.click();
+      }
+    }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON.value);
+
+    await page.evaluate(() => {
+      localStorage.setItem('tg-explorer-channel-url', window.location.href);
+    });
   }
 }
 

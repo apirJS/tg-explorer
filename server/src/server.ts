@@ -6,7 +6,7 @@ import Scraper from './scraper';
 import { WSMessage } from './lib/types';
 
 const scraper = await initializeScraper({
-  headless: true,
+  headless: false,
   userDataDir: path.resolve(__dirname, '../session'),
 });
 

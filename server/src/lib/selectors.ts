@@ -9,20 +9,24 @@ const selectors = {
           '#LeftMainHeader > div.DropdownMenu.main-menu > div > div > div:has(i.icon-settings)',
       },
       FULLNAME_CONTAINER: {
-        value:
-          '.ProfileInfo > div:nth-child(2) > div > h3',
+        value: '.ProfileInfo > div:nth-child(2) > div > h3',
       },
     },
   },
-  NEW_CHAT_BUTTON: {
+  NEW_CHANNEL_BUTTON: {
     value:
-      '#LeftColumn-main > div.NewChatButton.revealed > button > i.icon.icon-new-chat-filled',
+      '#LeftColumn-main > div.NewChatButton > div > div > div:nth-child(1)',
     children: {
-      NEW_CHANNEL_BUTTON: {
-        value: '.NewChatButton > .Menu > div:nth-child(2) > div > i',
+      NEXT_BUTTON: {
+        value: '#NewChat > div > div.NewChat-inner.step-1 > button',
         children: {
-          NEXT_ARROW_BUTTON: {
-            value: '.NewChat-inner > button',
+          NEXT_BUTTON: {
+            value:
+              '#NewChat > div.NewChat.Transition_slide.Transition_slide-active > button',
+          },
+          CHANNEL_NAME: {
+            value:
+              '#NewChat > div.NewChat.Transition_slide.Transition_slide-active > div.NewChat-inner.step-2 > div:nth-child(2) > input',
           },
         },
       },
