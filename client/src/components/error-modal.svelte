@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
+  import CloseIcon from '../icons/close-icon.svelte';
   let {
     error,
     refreshOnClose = false,
@@ -27,24 +28,15 @@
         <button
           class="absolute right-0"
           aria-label="close modal"
-          onclick={handleCloseModal}
-          ><svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill="currentColor"
-              d="M6.4 19L5 17.6l5.6-5.6L5 6.4L6.4 5l5.6 5.6L17.6 5L19 6.4L13.4 12l5.6 5.6l-1.4 1.4l-5.6-5.6z"
-            />
-          </svg></button
+          onclick={handleCloseModal}><CloseIcon /></button
         >
       </div>
       <div
         class="border border-neutral-500/30 rounded-sm h-full overflow-y-auto break-all p-1"
       >
-        <p class="select-text">{error instanceof Error ? error.message : 'Unknown error.'}</p>
+        <p class="select-text">
+          {error instanceof Error ? error.message : 'Unknown error.'}
+        </p>
       </div>
       <div class="flex justify-end pr-4 items-center h-full">
         <button

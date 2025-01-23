@@ -141,7 +141,7 @@ class Scraper {
     const page = await this.getPage();
     const userId = await page.evaluate(() => {
       const data = localStorage.getItem('user_auth');
-      return data ? JSON.parse(data).id : 'unknown';
+      return data ? JSON.parse(data).id : null;
     });
     return userId;
   }
@@ -154,54 +154,63 @@ class Scraper {
   }
 
   async createChannel(userId: string) {
-    const page = await this.getPage();
+    try {
+      const page = await this.getPage();
 
-    await page.waitForSelector(selectors.NEW_CHANNEL_BUTTON.value);
-    await page.evaluate((query) => {
-      const newChannelButton = document.querySelector(query) as HTMLDivElement;
-      if (newChannelButton) {
-        newChannelButton.click();
-      }
-    }, selectors.NEW_CHANNEL_BUTTON.value);
+      await page.waitForSelector(selectors.NEW_CHANNEL_BUTTON.value);
+      await page.evaluate((query) => {
+        const newChannelButton = document.querySelector(
+          query
+        ) as HTMLDivElement;
+        if (newChannelButton) {
+          newChannelButton.click();
+        }
+      }, selectors.NEW_CHANNEL_BUTTON.value);
 
-    await page.waitForSelector(
-      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value
-    );
-    await page.evaluate((query) => {
-      const newChannelButton = document.querySelector(
-        query
-      ) as HTMLButtonElement;
-      if (newChannelButton) {
-        newChannelButton.click();
-      }
-    }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value);
+      await page.waitForSelector(
+        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value
+      );
+      await page.evaluate((query) => {
+        const newChannelButton = document.querySelector(
+          query
+        ) as HTMLButtonElement;
+        if (newChannelButton) {
+          newChannelButton.click();
+        }
+      }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value);
 
-    await page.waitForSelector(
-      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
-        .value
-    );
-    await page.type(
-      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
-        .value,
-      userId
-    );
+      await page.waitForSelector(
+        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
+          .value
+      );
+      await page.type(
+        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
+          .value,
+        userId
+      );
 
-    await page.waitForSelector(
-      selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON
-        .value
-    );
-    await page.evaluate((query) => {
-      const newChannelButton = document.querySelector(
-        query
-      ) as HTMLButtonElement;
-      if (newChannelButton) {
-        newChannelButton.click();
-      }
-    }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON.value);
+      await page.waitForSelector(
+        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON
+          .value
+      );
+      await page.evaluate((query) => {
+        const newChannelButton = document.querySelector(
+          query
+        ) as HTMLButtonElement;
+        if (newChannelButton) {
+          newChannelButton.click();
+        }
+      }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON.value);
 
-    await page.evaluate(() => {
-      localStorage.setItem('tg-explorer-channel-url', window.location.href);
-    });
+      const url = await page.evaluate(() => {
+        localStorage.setItem('tg-explorer-channel-url', window.location.href);
+        return window.location.href;
+      });
+
+      return url;
+    } catch (error) {
+      return null;
+    }
   }
 }
 

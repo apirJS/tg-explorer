@@ -23,7 +23,7 @@ new Elysia()
       }
     },
   })
-  .get('/login', async ({ set }) => {
+  .post('/login', async ({ set }) => {
     const authenticated = await scraper.isUserAuthenticated();
     if (!authenticated) {
       return error('Unauthorized', { message: 'User is not authenticated.' });
@@ -36,6 +36,32 @@ new Elysia()
         username,
       },
     };
+  })
+  .post('/channels', async ({ set }) => {
+    const userId = await scraper.getUserId();
+    if (!userId) {
+      return error('Unauthorized', {
+        message: 'Failed to retrive userId.',
+      });
+    }
+
+    const isChannelExists = await scraper.isChannelExists();
+    if (!isChannelExists) {
+      const channelURL = await scraper.createChannel(userId);
+      if (!channelURL) {
+        return error('Internal Server Error', {
+          message: 'Failed to create channel',
+        });
+      }
+      set.status = 'Created';
+      return {
+        data: {
+          channelURL,
+        },
+      };
+    } else {
+      return error('Conflict', { message: 'channel already exists.' });
+    }
   })
   .listen({ idleTimeout: 120, port: 3000 }, () => {
     console.log('Server listening on http://localhost:3000');

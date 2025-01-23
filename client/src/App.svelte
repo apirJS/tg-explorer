@@ -9,6 +9,7 @@
   let webSocketError = $state<boolean>(false);
   let dots = $state<string>('');
   let intervalId: number | undefined = undefined;
+  let channelURL = $state<string | null>(null);
 
   onMount(() => {
     connectWebSocket();
@@ -19,7 +20,9 @@
     loading = true;
     animateDots();
     try {
-      const response = await fetch('http://localhost:3000/login');
+      const response = await fetch('http://localhost:3000/login', {
+        method: 'POST',
+      });
       if (!response.ok) {
         error = new Error('Failed to login.');
         const msg: WSMessage = {
@@ -42,6 +45,24 @@
     }
   }
 
+  async function createChannel() {
+    loading = true;
+    try {
+    } catch (error) {
+      const response = await fetch('http://localhost:3000/channels', {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      channelURL = data.data.channelURL;
+    } finally {
+      loading = false;
+    }
+  }
+
   function connectWebSocket() {
     ws = new WebSocket('ws://localhost:3000/ws');
 
@@ -60,16 +81,17 @@
   }
 
   function animateDots() {
+    const patterns = ['.', '..', '...', ''];
     if (intervalId) {
       clearInterval(intervalId);
     }
 
     let speed = 300;
-    let len = 1;
+    let index = 0;
 
     intervalId = setInterval(() => {
-      dots = '.'.repeat(len);
-      len = len === 3 ? 0 : len + 1;
+      dots = patterns[index];
+      index = index === patterns.length - 1 ? 0 : index + 1;
     }, speed);
   }
 </script>
@@ -82,7 +104,7 @@
     />
   {:else}
     <div
-      class="flex flex-col w-60 h-40 justify-center items-center p-4 relative"
+      class="flex flex-col w-60 h-40 justify-center items-center border p-4 relative"
     >
       {#if !username}
         <button
@@ -91,14 +113,16 @@
           class="[] disabled:opacity-70 disabled:hover:border-blue-300/50 w-20 text-lg bg-none rounded border-2 border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
           >Login</button
         >
-      {:else if error}
-        <ErrorModal {error} />
       {:else}
         <span>Welcome {username}</span>
       {/if}
 
       {#if loading}
-        <span class="absolute bottom-5">loading{dots}</span>
+        <span class="absolute bottom-5">loading{@html dots}</span>
+      {/if}
+
+      {#if error}
+        <ErrorModal {error} />
       {/if}
     </div>
   {/if}
