@@ -1,5 +1,5 @@
 <div
-  class="w-12 aspect-square rounded-full border-8 border-lightblue border-r-orange animate-spin"
+  class="w-4 aspect-square rounded-full border-[3px] border-gray-300 border-r-gray-600 animate-spin"
 ></div>
 
 <style>

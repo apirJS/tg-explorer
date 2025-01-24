@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
   import CloseIcon from '../icons/close-icon.svelte';
+  
   let {
     error,
     refreshOnClose = false,

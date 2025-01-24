@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import type { WSMessage } from './lib/types';
   import ErrorModal from './components/error-modal.svelte';
+  import LoadingToast from './components/loading-toast.svelte';
+
   let loading = $state<boolean>(false);
   let username = $state<string | null>(null);
   let error = $state<Error | unknown | null>(null);
@@ -17,6 +19,12 @@
   });
 
   async function login() {
+    const data = localStorage.getItem('username');
+    if (data) {
+      username = data;
+      return;
+    }
+
     loading = true;
     animateDots();
     try {
@@ -34,6 +42,7 @@
 
       const data = await response.json();
       username = data.data.username;
+      localStorage.setItem('username', username!);
     } catch (err) {
       error = err;
       setTimeout(() => {
@@ -48,7 +57,6 @@
   async function createChannel() {
     loading = true;
     try {
-    } catch (error) {
       const response = await fetch('http://localhost:3000/channels', {
         method: 'POST',
       });
@@ -58,6 +66,11 @@
 
       const data = await response.json();
       channelURL = data.data.channelURL;
+    } catch (err) {
+      error = err;
+      setTimeout(() => {
+        error = null;
+      }, 3000);
     } finally {
       loading = false;
     }
@@ -115,10 +128,13 @@
         >
       {:else}
         <span>Welcome {username}</span>
+        <button onclick={createChannel} aria-label="create channel"
+          >Create channel</button
+        >
       {/if}
 
       {#if loading}
-        <span class="absolute bottom-5">loading{@html dots}</span>
+        <LoadingToast />
       {/if}
 
       {#if error}
