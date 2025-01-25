@@ -22,11 +22,11 @@ const selectors = {
         children: {
           NEXT_BUTTON: {
             value:
-              '#NewChat > div.NewChat.Transition_slide.Transition_slide-active > button',
+              '#NewChat > div.NewChat.step-1.Transition_slide.Transition_slide-active > div.NewChat-inner.step-1 > button',
           },
           CHANNEL_NAME: {
             value:
-              '#NewChat > div.NewChat.Transition_slide.Transition_slide-active > div.NewChat-inner.step-2 > div:nth-child(2) > input',
+              '#NewChat > div.NewChat.Transition_slide.Transition_slide-active > button',
           },
         },
       },
