@@ -6,3 +6,7 @@ export type WSMessage<T = undefined> = {
   type: WSMessageTypes;
   data?: T;
 };
+
+export type IDBOperationSuccess<T> = { data: T };
+export type IDBOperationFailed = { error: Error };
+export type IDBOperationResult<T> = IDBOperationFailed | IDBOperationSuccess<T>;

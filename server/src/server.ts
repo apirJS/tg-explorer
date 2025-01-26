@@ -19,17 +19,11 @@ new Elysia()
     },
     message(ws, msg: WSMessage) {
       switch (msg.type) {
-        case 'get_creds':
         //
       }
     },
   })
   .post('/login', async ({ set }) => {
-    const authenticated = await scraper.isUserAuthenticated();
-    if (!authenticated) {
-      return error('Unauthorized', { message: 'User is not authenticated.' });
-    }
-
     const username = await scraper.getUsername();
     set.status = 'OK';
     return {

@@ -97,15 +97,8 @@ class Scraper {
     await page.screenshot({ path: 'assets/telegram.png' });
   }
 
-  async isUserAuthenticated(): Promise<boolean> {
-    const page = await this.browser.newPage();
-    await page.goto(`${BASE_TELEGRAM_URL}a/`);
-    await page.waitForSelector('#Main');
-    const authenticated = await page.evaluate(
-      () => !!document.getElementById('Main')
-    );
-    await page.close();
-    return authenticated;
+  async isUserAuthenticated() {
+    return 
   }
 
   async relaunch(options: LaunchOptions) {

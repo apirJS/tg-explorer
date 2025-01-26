@@ -2,6 +2,7 @@ import { LaunchOptions, Page } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import Scraper from '../scraper';
+import { IDBOperationResult, IDBOperationSuccess } from './types';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -28,4 +29,11 @@ export function isSessionFolderExists(): boolean {
 
 export async function initializeScraper(options?: LaunchOptions) {
   return await Scraper.getInstance(options);
+}
+
+
+export function isIDBOperationSuccess<T = any>(
+  result: IDBOperationResult<T>
+): result is IDBOperationSuccess<T> {
+  return (result as IDBOperationSuccess<T>).data !== undefined;
 }
