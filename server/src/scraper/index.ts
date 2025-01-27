@@ -1,7 +1,9 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
-import { BASE_TELEGRAM_URL } from '../lib/const';
+import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from '../lib/const';
 import path from 'path';
 import selectors from '../lib/selectors';
+import { getAuthState } from './indexedDB/services';
+import { isIDBOperationSuccess } from '../lib/utils';
 
 class Scraper {
   private static instance: Scraper;
@@ -97,37 +99,27 @@ class Scraper {
     await page.screenshot({ path: 'assets/telegram.png' });
   }
 
-  async isUserAuthenticated() {
-    return 
+  async isUserAuthenticated(): Promise<boolean | Error> {
+    const page = await this.getPage();
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+    }
+
+    const authState = await page.evaluate(async () => {
+      return await getAuthState();
+    });
+    if (!isIDBOperationSuccess(authState)) {
+      return authState.error;
+    }
+
+    return authState.data.authState === VALID_AUTH_STATE;
   }
 
   async relaunch(options: LaunchOptions) {
     await this.browser.close();
     this.browser = await puppeteer.launch(options);
     this.currentPage = await this.getPage();
-  }
-
-  async getUsername() {
-    const page = await this.getPage();
-    await this.openTelegram();
-
-    await page.waitForSelector(
-      selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value
-    );
-    await page.evaluate((query) => {
-      const e: HTMLDivElement | null = document.querySelector(query);
-      e?.click();
-    }, selectors.HAMBURGER_MENU.children.SETTINGS_BUTTON.value);
-
-    await page.waitForSelector(
-      selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value
-    );
-    const username = await page.evaluate((query) => {
-      const element: HTMLHeadingElement | null = document.querySelector(query);
-      return element ? element.innerHTML : null;
-    }, selectors.HAMBURGER_MENU.children.FULLNAME_CONTAINER.value);
-
-    return username;
   }
 
   async getUserId() {
@@ -146,65 +138,6 @@ class Scraper {
     }));
   }
 
-  async createChannel(userId: string) {
-    try {
-      const page = await this.getPage();
-
-      await page.waitForSelector(selectors.NEW_CHANNEL_BUTTON.value);
-      await page.evaluate((query) => {
-        const newChannelButton = document.querySelector(
-          query
-        ) as HTMLDivElement;
-        if (newChannelButton) {
-          newChannelButton.click();
-        }
-      }, selectors.NEW_CHANNEL_BUTTON.value);
-
-      await page.waitForSelector(
-        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value
-      );
-      await page.evaluate((query) => {
-        const newChannelButton = document.querySelector(
-          query
-        ) as HTMLButtonElement;
-        if (newChannelButton) {
-          newChannelButton.click();
-        }
-      }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.value);
-
-      await page.waitForSelector(
-        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
-          .value
-      );
-      await page.type(
-        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.CHANNEL_NAME
-          .value,
-        userId
-      );
-
-      await page.waitForSelector(
-        selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON
-          .value
-      );
-      await page.evaluate((query) => {
-        const newChannelButton = document.querySelector(
-          query
-        ) as HTMLButtonElement;
-        if (newChannelButton) {
-          newChannelButton.click();
-        }
-      }, selectors.NEW_CHANNEL_BUTTON.children.NEXT_BUTTON.children.NEXT_BUTTON.value);
-
-      const url = await page.evaluate(() => {
-        localStorage.setItem('tg-explorer-channel-url', window.location.href);
-        return window.location.href;
-      });
-
-      return url;
-    } catch (error) {
-      return null;
-    }
-  }
 }
 
 export default Scraper;

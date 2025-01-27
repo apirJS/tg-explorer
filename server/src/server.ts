@@ -11,15 +11,16 @@ const scraper = await initializeScraper({
 });
 
 new Elysia()
-  .state('userId', '')
   .use(cors({ origin: 'http://localhost:5173' }))
   .ws('/ws', {
     open(ws) {
       console.log('WS connected: ', ws.id);
     },
     message(ws, msg: WSMessage) {
-      switch (msg.type) {
+      switch (
+        msg.type
         //
+      ) {
       }
     },
   })
@@ -32,13 +33,17 @@ new Elysia()
       },
     };
   })
-  .onBeforeHandle(async ({ store }) => {
-    const userId = await scraper.getUserId();
-    if (!userId) {
-      return error('Unauthorized', { message: 'Credentials not found.' });
+  .onBeforeHandle(async () => {
+    const result = await scraper.isUserAuthenticated();
+    if (result instanceof Error) {
+      return error('Unauthorized', {
+        message: result.message,
+      });
     }
 
-    store.userId = userId;
+    if (result === false) {
+      return error('Unauthorized', { message: 'User not authenticated.' });
+    }
   })
   .post('/channels', async ({ set, store: { userId } }) => {
     const isChannelExists = await scraper.isChannelExists();
