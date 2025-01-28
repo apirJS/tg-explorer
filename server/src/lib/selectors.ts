@@ -24,25 +24,45 @@ export function getFullName() {
     const element = document.querySelector(
       '#column-left > div > div > div.sidebar-header.can-have-forum > div.sidebar-header__btn-container > button'
     );
-    element?.dispatchEvent(mouseEvent);
+    if (!element) {
+      console.error('Menu button not found');
+      return false;
+    }
+    element.dispatchEvent(mouseEvent);
+    return true;
   }
 
-  openMenu();
+  if (!openMenu()) {
+    return null;
+  }
 
   const spans = document.querySelectorAll(
     '#column-left > div > div > div.sidebar-header.can-have-forum > div.sidebar-header__btn-container > button > div.btn-menu.bottom-right.has-footer.active.was-open > div > span:nth-child(3)'
   );
+
+  let settingsSpanFound = false;
   spans.forEach((span) => {
     if (span.innerHTML === 'Settings') {
       span.dispatchEvent(mouseEvent);
+      settingsSpanFound = true;
     }
   });
 
-  const fullName = document.querySelector(
-    '#column-left > div > div.tabs-tab.sidebar-slider-item.scrolled-top.scrolled-bottom.scrollable-y-bordered.settings-container.profile-container.is-collapsed.active > div.sidebar-content > div > div.profile-content.is-me > div.profile-avatars-container > div.profile-avatars-info > div.profile-name > span'
-  )?.innerHTML;
+  if (!settingsSpanFound) {
+    console.error('Settings span not found');
+    return null;
+  }
 
-  return fullName;
+  const fullNameElement = document.querySelector(
+    '#column-left > div > div.tabs-tab.sidebar-slider-item.scrolled-top.scrolled-bottom.scrollable-y-bordered.settings-container.profile-container.is-collapsed.active > div.sidebar-content > div > div.profile-content.is-me > div.profile-avatars-container > div.profile-avatars-info > div.profile-name > span'
+  );
+
+  if (!fullNameElement) {
+    console.error('Full name element not found');
+    return null;
+  }
+
+  return fullNameElement.innerHTML || null;
 }
 
 export default selectors;

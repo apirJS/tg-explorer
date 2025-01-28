@@ -138,6 +138,29 @@ class Scraper {
     }));
   }
 
+  async waitForLogin(timeout: number = 300_000): Promise<boolean> {
+    const page = await this.getPage();
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+    }
+
+    return new Promise((resolve, reject) => {
+      const intervalId = setInterval(async () => {
+        const result = await this.isUserAuthenticated();
+        if (result === true) {
+          clearInterval(intervalId);
+          clearTimeout(timeoutId);
+          return resolve(true);
+        }
+      }, 1000);
+
+      const timeoutId = setTimeout(() => {
+        clearInterval(intervalId);
+        reject(false);
+      }, timeout);
+    });
+  }
 }
 
 export default Scraper;

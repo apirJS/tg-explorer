@@ -16,22 +16,53 @@ new Elysia()
     open(ws) {
       console.log('WS connected: ', ws.id);
     },
-    message(ws, msg: WSMessage) {
-      switch (
-        msg.type
-        //
-      ) {
+    async message(ws, msg: WSMessage) {
+      switch (msg.type) {
+        case 'login':
+          try {
+            const result = await scraper.isUserAuthenticated();
+            if (result instanceof Error) {
+              const message: WSMessage<{ message: string }> = {
+                type: 'error',
+                data: {
+                  message: result.message,
+                },
+              };
+              return ws.send(JSON.stringify(message));
+            }
+
+            if (result === true) {
+              const message: WSMessage = {
+                type: 'already_signed',
+              };
+              return ws.send(JSON.stringify(message));
+            }
+
+            // START A POOLING TO WAIT FOR LOGIN SUCCESS EVENT
+            const success = await scraper.waitForLogin();
+            if (!success) {
+              const message: WSMessage = {
+                type: 'timeout',
+              };
+              return ws.send(JSON.stringify(message));
+            }
+
+            const message: WSMessage = {
+              type: 'login_success',
+            };
+            return ws.send(JSON.stringify(message));
+          } catch (error) {
+            const message: WSMessage<{ message: string }> = {
+              type: 'error',
+              data: {
+                message:
+                  error instanceof Error ? error.message : 'Unknown error',
+              },
+            };
+            return ws.send(JSON.stringify(message));
+          }
       }
     },
-  })
-  .post('/login', async ({ set }) => {
-    const username = await scraper.getUsername();
-    set.status = 'OK';
-    return {
-      data: {
-        username,
-      },
-    };
   })
   .onBeforeHandle(async () => {
     const result = await scraper.isUserAuthenticated();
@@ -45,24 +76,8 @@ new Elysia()
       return error('Unauthorized', { message: 'User not authenticated.' });
     }
   })
-  .post('/channels', async ({ set, store: { userId } }) => {
-    const isChannelExists = await scraper.isChannelExists();
-    if (!isChannelExists) {
-      const channelURL = await scraper.createChannel(userId);
-      if (!channelURL) {
-        return error('Internal Server Error', {
-          message: 'Failed to create channel',
-        });
-      }
-      set.status = 'Created';
-      return {
-        data: {
-          channelURL,
-        },
-      };
-    } else {
-      return error('Conflict', { message: 'channel already exists.' });
-    }
+  .post('/channels', async () => {
+    //
   })
   .listen({ idleTimeout: 120, port: 3000 }, () => {
     console.log('Server listening on http://localhost:3000');
