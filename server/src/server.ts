@@ -47,7 +47,19 @@ new Elysia()
               return ws.send(JSON.stringify(message));
             }
 
-            const message: WSMessage = {
+            const fullName = await scraper.getFullName();
+            if (fullName === null) {
+              const message: WSMessage<{ message: string }> = {
+                type: 'error',
+                data: {
+                  message: 'Failed to retrieve fullname.',
+                },
+              };
+              return ws.send(JSON.stringify(message));
+            }
+
+            await scraper.setItemOnLocalStorage('fullName', fullName);
+            const message: WSMessage<{ fullName: string }> = {
               type: 'login_success',
             };
             return ws.send(JSON.stringify(message));

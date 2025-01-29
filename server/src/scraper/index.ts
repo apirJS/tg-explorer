@@ -1,7 +1,7 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from '../lib/const';
 import path from 'path';
-import selectors from '../lib/selectors';
+import selectors, { getFullName } from '../lib/selectors';
 import { getAuthState } from './indexedDB/services';
 import { isIDBOperationSuccess } from '../lib/utils';
 
@@ -151,15 +151,47 @@ class Scraper {
         if (result === true) {
           clearInterval(intervalId);
           clearTimeout(timeoutId);
+          await this.openTelegram('k');
           return resolve(true);
         }
       }, 1000);
 
-      const timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(async () => {
         clearInterval(intervalId);
-        reject(false);
+        await this.openTelegram('k');
+        return reject(false);
       }, timeout);
     });
+  }
+
+  async getFullName() {
+    const page = await this.getPage();
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+    }
+
+    const fullName = await page.evaluate(() => {
+      return getFullName();
+    });
+
+    await this.openTelegram('k');
+    return fullName;
+  }
+
+  async setItemOnLocalStorage(key: string, value: string) {
+    const page = await this.getPage();
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+    }
+
+    await page.evaluate(
+      ([key, value]) => {
+        localStorage.setItem(key, value);
+      },
+      [key, value]
+    );
   }
 }
 

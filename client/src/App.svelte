@@ -19,7 +19,7 @@
   });
 
   async function login() {
-    const data = localStorage.getItem('username');
+    const data = localStorage.getItem('fullName');
     if (data) {
       username = data;
       return;
@@ -28,21 +28,7 @@
     loading = true;
     animateDots();
     try {
-      const response = await fetch('http://localhost:3000/login', {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        error = new Error('Failed to login.');
-        const msg: WSMessage = {
-          type: 'get_creds',
-        };
-        ws?.send(JSON.stringify(msg));
-        return;
-      }
-
-      const data = await response.json();
-      username = data.data.username;
-      localStorage.setItem('username', username!);
+      
     } catch (err) {
       error = err;
       setTimeout(() => {
@@ -54,27 +40,6 @@
     }
   }
 
-  async function createChannel() {
-    loading = true;
-    try {
-      const response = await fetch('http://localhost:3000/channels', {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        return;
-      }
-
-      const data = await response.json();
-      channelURL = data.data.channelURL;
-    } catch (err) {
-      error = err;
-      setTimeout(() => {
-        error = null;
-      }, 3000);
-    } finally {
-      loading = false;
-    }
-  }
 
   function connectWebSocket() {
     ws = new WebSocket('ws://localhost:3000/ws');
@@ -128,9 +93,6 @@
         >
       {:else}
         <span>Welcome {username}</span>
-        <button onclick={createChannel} aria-label="create channel"
-          >Create channel</button
-        >
       {/if}
 
       {#if loading}
