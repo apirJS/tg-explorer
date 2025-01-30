@@ -1,9 +1,9 @@
 import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from '../lib/const';
 import path from 'path';
-import selectors, { getFullName } from '../lib/selectors';
-import { getAuthState } from './indexedDB/services';
+import { getFullName } from '../lib/selectors';
 import { isIDBOperationSuccess } from '../lib/utils';
+import { IDBOperationResult } from '../lib/types';
 
 class Scraper {
   private static instance: Scraper;
@@ -106,9 +106,28 @@ class Scraper {
       await this.openTelegram('k');
     }
 
-    const authState = await page.evaluate(async () => {
-      return await getAuthState();
-    });
+    const authState = await page.evaluate(
+      async (): Promise<IDBOperationResult<{ authState: string }>> => {
+        return new Promise((resolve, reject) => {
+          const open = indexedDB.open('tweb');
+
+          open.onerror = () =>
+            reject({ error: new Error('Failed to open DB!') });
+
+          open.onsuccess = () => {
+            const db = open.result;
+            const transaction = db.transaction('session', 'readonly');
+            const store = transaction.objectStore('session');
+            const query = store.get('authState');
+
+            query.onsuccess = () =>
+              resolve({ data: { authState: query.result['_'] } });
+            query.onerror = () =>
+              reject({ error: new Error('Failed to retrieve data!') });
+          };
+        });
+      }
+    );
     if (!isIDBOperationSuccess(authState)) {
       return authState.error;
     }

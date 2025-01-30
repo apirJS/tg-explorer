@@ -9,26 +9,33 @@
   let error = $state<Error | unknown | null>(null);
   let ws = $state<WebSocket | null>(null);
   let webSocketError = $state<boolean>(false);
-  let dots = $state<string>('');
-  let intervalId: number | undefined = undefined;
-  let channelURL = $state<string | null>(null);
 
   onMount(() => {
     connectWebSocket();
-    login();
+    if (ws?.readyState !== ws?.CONNECTING) {
+      login();
+    }
   });
 
   async function login() {
-    const data = localStorage.getItem('fullName');
-    if (data) {
-      username = data;
-      return;
-    }
-
     loading = true;
-    animateDots();
+
     try {
-      
+      const data = localStorage.getItem('fullName');
+      if (data) {
+        username = data;
+        return;
+      }
+
+      if (ws) {
+        const message: WSMessage<{ timeout: number }> = {
+          type: 'login',
+          data: {
+            timeout: 1000 * 60 * 1,
+          },
+        };
+        ws.send(JSON.stringify(message));
+      }
     } catch (err) {
       error = err;
       setTimeout(() => {
@@ -36,10 +43,8 @@
       }, 3000);
     } finally {
       loading = false;
-      clearInterval(intervalId);
     }
   }
-
 
   function connectWebSocket() {
     ws = new WebSocket('ws://localhost:3000/ws');
@@ -57,21 +62,6 @@
       error = err;
     });
   }
-
-  function animateDots() {
-    const patterns = ['.', '..', '...', ''];
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
-
-    let speed = 300;
-    let index = 0;
-
-    intervalId = setInterval(() => {
-      dots = patterns[index];
-      index = index === patterns.length - 1 ? 0 : index + 1;
-    }, speed);
-  }
 </script>
 
 <main class="grid place-items-center min-h-screen">
@@ -82,13 +72,13 @@
     />
   {:else}
     <div
-      class="flex flex-col w-60 h-40 justify-center items-center border p-4 relative"
+      class="flex flex-col w-60 h-40 justify-center items-center p-4 relative"
     >
       {#if !username}
         <button
           disabled={loading}
           onclick={login}
-          class="[] disabled:opacity-70 disabled:hover:border-blue-300/50 w-20 text-lg bg-none rounded border-2 border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
+          class="disabled:opacity-70 disabled:hover:border-blue-300/50 w-20 text-lg bg-none rounded border-2 border-blue-300/50 hover:border-blue-300 active:border-blue-500 hover:transition hover:duration-500 px-2 py-1 text-white"
           >Login</button
         >
       {:else}
@@ -98,10 +88,10 @@
       {#if loading}
         <LoadingToast />
       {/if}
-
-      {#if error}
-        <ErrorModal {error} />
-      {/if}
     </div>
   {/if}
 </main>
+
+{#if error}
+  <ErrorModal {error} />
+{/if}

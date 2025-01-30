@@ -16,7 +16,7 @@ new Elysia()
     open(ws) {
       console.log('WS connected: ', ws.id);
     },
-    async message(ws, msg: WSMessage) {
+    async message(ws, msg: WSMessage<any>) {
       switch (msg.type) {
         case 'login':
           try {
@@ -39,7 +39,7 @@ new Elysia()
             }
 
             // START A POOLING TO WAIT FOR LOGIN SUCCESS EVENT
-            const success = await scraper.waitForLogin();
+            const success = await scraper.waitForLogin(msg.data?.timeout);
             if (!success) {
               const message: WSMessage = {
                 type: 'timeout',
