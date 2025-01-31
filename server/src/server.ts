@@ -6,7 +6,7 @@ import Scraper from './scraper';
 import { WSMessage } from './lib/types';
 
 const scraper = await initializeScraper({
-  headless: false,
+  headless: true,
   userDataDir: path.resolve(__dirname, '../session'),
 });
 
@@ -48,11 +48,11 @@ new Elysia()
             }
 
             const fullName = await scraper.getFullName();
-            if (fullName === null) {
+            if (fullName instanceof Error) {
               const message: WSMessage<{ message: string }> = {
                 type: 'error',
                 data: {
-                  message: 'Failed to retrieve fullname.',
+                  message: fullName.message,
                 },
               };
               return ws.send(JSON.stringify(message));
@@ -61,6 +61,9 @@ new Elysia()
             await scraper.setItemOnLocalStorage('fullName', fullName);
             const message: WSMessage<{ fullName: string }> = {
               type: 'login_success',
+              data: {
+                fullName,
+              },
             };
             return ws.send(JSON.stringify(message));
           } catch (error) {

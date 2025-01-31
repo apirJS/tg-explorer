@@ -31,7 +31,7 @@
         const message: WSMessage<{ timeout: number }> = {
           type: 'login',
           data: {
-            timeout: 1000 * 60 * 1,
+            timeout: 1000 * 60 * 5,
           },
         };
         ws.send(JSON.stringify(message));
@@ -60,6 +60,20 @@
     ws.addEventListener('error', (err) => {
       webSocketError = true;
       error = err;
+    });
+
+    ws.addEventListener('message', (msg) => {
+      const message: WSMessage<any> = msg.data;
+
+      switch (message.type) {
+        case 'login_success':
+          username =
+            (message as WSMessage<{ fullName: string }>).data?.fullName ?? null;
+          return;
+        case 'already_signed':
+          alert('already_signed');
+          return;
+      }
     });
   }
 </script>
