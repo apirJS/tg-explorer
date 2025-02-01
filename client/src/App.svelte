@@ -4,28 +4,31 @@
   import ErrorModal from './components/error-modal.svelte';
   import LoadingToast from './components/loading-toast.svelte';
 
-  let loading = $state<boolean>(false);
   let username = $state<string | null>(null);
   let error = $state<Error | unknown | null>(null);
   let ws = $state<WebSocket | null>(null);
   let webSocketError = $state<boolean>(false);
+  let loading = $state<boolean>(false);
+  let cooldown = $state(1);
 
   onMount(() => {
+    loading = true;
     connectWebSocket();
-    if (ws?.readyState !== ws?.CONNECTING) {
+    if (ws && ws.readyState !== ws.CONNECTING) {
       login();
     }
+    loading = false;
   });
 
   async function login() {
     loading = true;
 
     try {
-      const data = localStorage.getItem('fullName');
-      if (data) {
-        username = data;
-        return;
-      }
+      // const data = localStorage.getItem('fullName');
+      // if (data) {
+      //   username = data;
+      //   return;
+      // }
 
       if (ws) {
         const message: WSMessage<{ timeout: number }> = {
@@ -54,7 +57,10 @@
     });
 
     ws.addEventListener('close', () => {
-      connectWebSocket();
+      setTimeout(() => {
+        connectWebSocket();
+        cooldown *= 2;
+      }, cooldown * 1000);
     });
 
     ws.addEventListener('error', (err) => {
@@ -69,6 +75,9 @@
         case 'login_success':
           username =
             (message as WSMessage<{ fullName: string }>).data?.fullName ?? null;
+          alert(
+            (message as WSMessage<{ fullName: string }>).data?.fullName ?? null
+          );
           return;
         case 'already_signed':
           alert('already_signed');
@@ -77,6 +86,14 @@
     });
   }
 </script>
+
+{#if loading}
+  <LoadingToast />
+{/if}
+
+{#if error}
+  <ErrorModal {error} />
+{/if}
 
 <main class="grid place-items-center min-h-screen">
   {#if webSocketError}
@@ -98,14 +115,6 @@
       {:else}
         <span>Welcome {username}</span>
       {/if}
-
-      {#if loading}
-        <LoadingToast />
-      {/if}
     </div>
   {/if}
 </main>
-
-{#if error}
-  <ErrorModal {error} />
-{/if}

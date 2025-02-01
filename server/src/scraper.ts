@@ -1,8 +1,10 @@
-import puppeteer, { Browser, LaunchOptions, Page } from 'puppeteer';
-import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from '../lib/const';
+import { Browser, LaunchOptions, Page } from 'puppeteer';
+import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from './lib/const';
 import path from 'path';
-import { isIDBOperationSuccess } from '../lib/utils';
-import { IDBOperationResult } from '../lib/types';
+import { isIDBOperationSuccess } from './lib/utils';
+import { IDBOperationResult } from './lib/types';
+import puppeteer from 'puppeteer-extra';
+import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 class Scraper {
   private static instance: Scraper;
@@ -22,69 +24,54 @@ class Scraper {
   }
 
   private async init(options?: LaunchOptions) {
-    this.browser = await puppeteer.launch(options);
+    puppeteer.use(stealthPlugin());
+    this.browser = await puppeteer.launch({
+      ...options,
+      defaultViewport: { width: 1280, height: 720 },
+    });
     await this.getPage();
     return this.browser;
   }
 
   private async getPage(): Promise<Page> {
-    const [page] = await this.browser.pages();
-    this.currentPage = page || (await this.browser.newPage());
+    // If currentPage exists and is still open, return it
+    if (this.currentPage) {
+      try {
+        // Check if page is still accessible (it might be closed)
+        await this.currentPage.title(); // any simple operation
+        return this.currentPage;
+      } catch {
+        // If it throws, we'll create a new page below
+      }
+    }
+
+    // Get all pages; if none, create a new page
+    const pages = await this.browser.pages();
+    this.currentPage =
+      pages.length > 0 ? pages[0] : await this.browser.newPage();
     return this.currentPage;
   }
 
-  async openTelegram(type: 'a' | 'k' = 'a') {
+  async openTelegram(type: 'a' | 'k' = 'k') {
     const page = await this.getPage();
-    await page.goto(`${BASE_TELEGRAM_URL}${type}/`);
+    await page.goto(`${BASE_TELEGRAM_URL}/${type}/`);
   }
 
   async close() {
     await this.browser.close();
   }
 
-  private async captureLocalStorage() {
-    const page = await this.getPage();
-    this.localStorage = await page.evaluate(() => {
-      const data: Record<string, string> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          data[key] = localStorage.getItem(key) || '';
-        }
-      }
-      return data;
-    });
-    await Bun.write('localStorage.json', JSON.stringify(this.localStorage));
-  }
-
-  async getCredentials() {
-    const page = await this.getPage();
-    page.on('request', async (request) => {
-      const url = new URL(request.url());
-      if (url.pathname === '/_websync_' && url.searchParams.get('authed')) {
-        await this.captureLocalStorage();
-      }
-    });
-  }
-
-  async getLocalStorage() {
-    const filePath = path.resolve(__dirname, '../../creds/localStorage.json');
-    const file = Bun.file(filePath);
-    const ls = (await file.json()) ?? null;
-    return ls as Record<string, string> | null;
-  }
-
-  async capturePage() {
-    const page = await this.getPage();
-    await page.waitForNetworkIdle({ idleTime: 10_000 });
-    await page.screenshot({ path: 'assets/telegram.png' });
-  }
-
   async isUserAuthenticated(): Promise<boolean | Error> {
     const page = await this.getPage();
     const currentURL = page.url();
     if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('a');
+      await this.openTelegram('k');
+      // Wait until the page's URL includes the expected domain.
+      await page.waitForFunction(
+        (url) => window.location.href.includes(url),
+        {},
+        'web.telegram.org'
+      );
     }
 
     const result = await page.evaluate(
@@ -118,63 +105,78 @@ class Scraper {
 
   async relaunch(options: LaunchOptions) {
     await this.browser.close();
-    this.browser = await puppeteer.launch(options);
+    this.browser = await puppeteer.launch({
+      ...options,
+      defaultViewport: { width: 1280, height: 720 },
+    });
     this.currentPage = await this.getPage();
   }
 
   async getUserId() {
     const page = await this.getPage();
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+      // Wait until the page's URL includes the expected domain.
+      await page.waitForFunction(
+        (url) => window.location.href.includes(url),
+        {},
+        'web.telegram.org'
+      );
+    }
+
     const userId: string | null = await page.evaluate(() => {
       const data = localStorage.getItem('user_auth');
       return data ? JSON.parse(data).id : null;
     });
+    console.log('userID: ', userId);
     return userId;
-  }
-
-  async isChannelExists() {
-    const page = await this.getPage();
-    return !!(await page.evaluate(() => {
-      return localStorage.getItem('tg-explorer-channel-url');
-    }));
   }
 
   async waitForLogin(timeout: number = 300_000): Promise<boolean> {
     await this.relaunch({
       headless: false,
       userDataDir: path.resolve(__dirname, '../session'),
-      pipe: true
+      defaultViewport: { width: 1280, height: 720 },
     });
-    await this.openTelegram('a');
+    await this.openTelegram('k');
 
     return new Promise((resolve, reject) => {
-      let timeoutId: Timer | null = null;
+      const startTime = Date.now();
+      let finished = false;
+      let timeoutId: Timer;
 
-      const intervalId = setInterval(async () => {
+      const checkAuth = async () => {
+        if (finished) return;
+
         try {
-          const result = await this.isUserAuthenticated();
-          if (result === true) {
-            clearInterval(intervalId);
-            if (timeoutId) clearTimeout(timeoutId);
-            await this.openTelegram('a');
+          const result = await this.getUserId();
+          if (result !== null && typeof result === 'string') {
+            finished = true;
+            clearTimeout(timeoutId); // Stop any pending timeout
             resolve(true);
+          } else if (Date.now() - startTime >= timeout) {
+            finished = true;
+            clearTimeout(timeoutId);
+            reject(false);
+          } else {
+            timeoutId = setTimeout(checkAuth, 1000);
           }
         } catch (error) {
-          clearInterval(intervalId);
-          if (timeoutId) clearTimeout(timeoutId);
-          reject(error);
+          finished = true;
+          clearTimeout(timeoutId);
+          console.error(error);
+          reject(false);
         }
-      }, 1000);
+      };
 
-      timeoutId = setTimeout(() => {
-        clearInterval(intervalId);
-        reject(false);
-      }, timeout);
+      checkAuth();
     });
   }
 
   async getFullName() {
     const page = await this.getPage();
-    await this.openTelegram('a');
+    await this.openTelegram('k');
     const userId = await this.getUserId();
     if (userId === null) {
       return new Error('Failed to get userId.');
@@ -214,7 +216,6 @@ class Scraper {
       return result.error;
     }
 
-    await page.goto(BASE_TELEGRAM_URL + 'a');
     return result.data.fullName;
   }
 
@@ -222,7 +223,7 @@ class Scraper {
     const page = await this.getPage();
     const currentURL = page.url();
     if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('a');
+      await this.openTelegram('k');
     }
 
     await page.evaluate(

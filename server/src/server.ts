@@ -20,18 +20,10 @@ new Elysia()
       switch (msg.type) {
         case 'login':
           try {
-            const result = await scraper.isUserAuthenticated();
-            if (result instanceof Error) {
-              const message: WSMessage<{ message: string }> = {
-                type: 'error',
-                data: {
-                  message: result.message,
-                },
-              };
-              return ws.send(JSON.stringify(message));
-            }
+            const result = await scraper.getUserId();
+            console.log('AUTH_STATE: ', result)
 
-            if (result === true) {
+            if (result) {
               const message: WSMessage = {
                 type: 'already_signed',
               };
@@ -40,14 +32,16 @@ new Elysia()
 
             // START A POOLING TO WAIT FOR LOGIN SUCCESS EVENT
             const success = await scraper.waitForLogin(msg.data?.timeout);
+            console.log('success: ', success)
             if (!success) {
               const message: WSMessage = {
                 type: 'timeout',
               };
               return ws.send(JSON.stringify(message));
             }
-
+            
             const fullName = await scraper.getFullName();
+            console.log('fullName: ', fullName)
             if (fullName instanceof Error) {
               const message: WSMessage<{ message: string }> = {
                 type: 'error',
