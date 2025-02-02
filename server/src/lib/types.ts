@@ -13,5 +13,7 @@ export type WSMessage<T = undefined> = {
 };
 
 export type IDBOperationSuccess<T> = { data: T };
-export type IDBOperationFailed = { error: Error };
+export type IDBOperationFailed = { error: Error | DOMException };
 export type IDBOperationResult<T> = IDBOperationFailed | IDBOperationSuccess<T>;
+
+export type PageType = 'k' | 'a';

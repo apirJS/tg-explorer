@@ -10,7 +10,6 @@ class Scraper {
   private static instance: Scraper;
   private browser!: Browser;
   private currentPage?: Page;
-  public cookies?: string[];
   public localStorage?: Record<string, any>;
 
   private constructor() {}
@@ -23,11 +22,17 @@ class Scraper {
     return Scraper.instance;
   }
 
+  private async getPuppeteerDefaultArgs() {
+    return {
+      defaultViewport: { width: 1280, height: 720 },
+    } as LaunchOptions;
+  }
+
   private async init(options?: LaunchOptions) {
     puppeteer.use(stealthPlugin());
     this.browser = await puppeteer.launch({
+      ...this.getPuppeteerDefaultArgs(),
       ...options,
-      defaultViewport: { width: 1280, height: 720 },
     });
     await this.getPage();
     return this.browser;
@@ -73,27 +78,34 @@ class Scraper {
         'web.telegram.org'
       );
     }
-
     const result = await page.evaluate(
       async (): Promise<IDBOperationResult<{ authState: string }>> => {
-        return new Promise((resolve, reject) => {
-          const open = indexedDB.open('tweb');
+        const signal = AbortSignal.timeout(1000 * 60 * 2);
+        return Promise.race<IDBOperationResult<{ authState: string }>>([
+          new Promise((resolve, reject) => {
+            const open = indexedDB.open('tweb');
 
-          open.onerror = () =>
-            reject({ error: new Error('Failed to open DB!') });
+            open.onerror = () =>
+              reject({ error: new Error('Failed to open DB!') });
 
-          open.onsuccess = () => {
-            const db = open.result;
-            const transaction = db.transaction('session', 'readonly');
-            const store = transaction.objectStore('session');
-            const query = store.get('authState');
+            open.onsuccess = () => {
+              const db = open.result;
+              const transaction = db.transaction('session', 'readonly');
+              const store = transaction.objectStore('session');
+              const query = store.get('authState');
 
-            query.onsuccess = () =>
-              resolve({ data: { authState: query.result['_'] } });
-            query.onerror = () =>
-              reject({ error: new Error('Failed to retrieve data!') });
-          };
-        });
+              query.onsuccess = () =>
+                resolve({ data: { authState: query.result['_'] } });
+              query.onerror = () =>
+                reject({ error: new Error('Failed to retrieve data!') });
+            };
+          }),
+          new Promise((_, reject) =>
+            signal.addEventListener('abort', () =>
+              reject({ error: new DOMException('AbortError', 'AbortError') })
+            )
+          ),
+        ]);
       }
     );
     if (!isIDBOperationSuccess(result)) {
@@ -106,8 +118,8 @@ class Scraper {
   async relaunch(options: LaunchOptions) {
     await this.browser.close();
     this.browser = await puppeteer.launch({
+      ...this.getPuppeteerDefaultArgs(),
       ...options,
-      defaultViewport: { width: 1280, height: 720 },
     });
     this.currentPage = await this.getPage();
   }
@@ -151,7 +163,8 @@ class Scraper {
 
         try {
           const result = await this.getUserId();
-          if (result !== null && typeof result === 'string') {
+          if (result) {
+            console.log('result is catched', result);
             finished = true;
             clearTimeout(timeoutId); // Stop any pending timeout
             resolve(true);
@@ -175,8 +188,19 @@ class Scraper {
   }
 
   async getFullName() {
+    console.log('getting fullname');
     const page = await this.getPage();
-    await this.openTelegram('k');
+    const currentURL = page.url();
+    if (!currentURL.includes('web.telegram.org')) {
+      await this.openTelegram('k');
+      // Wait until the page's URL includes the expected domain.
+      await page.waitForFunction(
+        (url) => window.location.href.includes(url),
+        {},
+        'web.telegram.org'
+      );
+    }
+
     const userId = await this.getUserId();
     if (userId === null) {
       return new Error('Failed to get userId.');
@@ -184,30 +208,38 @@ class Scraper {
 
     const result = await page.evaluate(
       async (userId): Promise<IDBOperationResult<{ fullName: string }>> => {
-        return new Promise((resolve, reject) => {
-          const open = indexedDB.open('tweb');
+        const signal = AbortSignal.timeout(1000 * 60 * 2);
+        return Promise.race<IDBOperationResult<{ fullName: string }>>([
+          new Promise((resolve, reject) => {
+            const open = indexedDB.open('tweb');
 
-          open.onerror = () =>
-            reject({ error: new Error('Failed to open DB!') });
+            open.onerror = () =>
+              reject({ error: new Error('Failed to open DB!') });
 
-          open.onsuccess = () => {
-            const db = open.result;
-            const transaction = db.transaction('users', 'readonly');
-            const store = transaction.objectStore('users');
-            const query = store.get(userId);
+            open.onsuccess = () => {
+              const db = open.result;
+              const transaction = db.transaction('users', 'readonly');
+              const store = transaction.objectStore('users');
+              const query = store.get(userId);
 
-            query.onsuccess = () =>
-              resolve({
-                data: {
-                  fullName: `${query.result['first_name']} ${
-                    query.result['last_name'] ?? ''
-                  }`,
-                },
-              });
-            query.onerror = () =>
-              reject({ error: new Error('Failed to retrieve data!') });
-          };
-        });
+              query.onsuccess = () =>
+                resolve({
+                  data: {
+                    fullName: `${query.result['first_name']} ${
+                      query.result['last_name'] ?? ''
+                    }`,
+                  },
+                });
+              query.onerror = () =>
+                reject({ error: new Error('Failed to retrieve data!') });
+            };
+          }),
+          new Promise((_, reject) =>
+            signal.addEventListener('abort', () =>
+              reject({ error: new DOMException('AbortError', 'AbortError') })
+            )
+          ),
+        ]);
       },
       userId
     );

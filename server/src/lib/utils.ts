@@ -31,9 +31,12 @@ export async function initializeScraper(options?: LaunchOptions) {
   return await Scraper.getInstance(options);
 }
 
-
 export function isIDBOperationSuccess<T = any>(
   result: IDBOperationResult<T>
 ): result is IDBOperationSuccess<T> {
   return (result as IDBOperationSuccess<T>).data !== undefined;
+}
+
+export function formatFullName(firstName: string, lastName?: string): string {
+  return `${firstName} ${lastName}`.trim();
 }
