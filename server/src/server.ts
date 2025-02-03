@@ -1,14 +1,9 @@
 import { Elysia, error } from 'elysia';
 import { cors } from '@elysiajs/cors';
-import { initializeScraper } from './lib/utils';
-import path from 'path';
-import Scraper from './scraper';
 import { WSMessage } from './lib/types';
+import TelegramScraper from './scraper';
 
-const scraper = await initializeScraper({
-  headless: true,
-  userDataDir: path.resolve(__dirname, '../session'),
-});
+const scraper = await TelegramScraper.createInstance({ headless: true });
 
 new Elysia()
   .use(cors({ origin: 'http://localhost:5173' }))
@@ -20,69 +15,60 @@ new Elysia()
       switch (msg.type) {
         case 'login':
           try {
-            const result = await scraper.getUserId();
-            console.log('AUTH_STATE: ', result)
-
-            if (result) {
+            const isUserAuthenticated = await scraper.checkAuthentication();
+            if (isUserAuthenticated) {
               const message: WSMessage = {
                 type: 'already_signed',
               };
-              return ws.send(JSON.stringify(message));
+
+              ws.send(JSON.stringify(message));
             }
 
-            // START A POOLING TO WAIT FOR LOGIN SUCCESS EVENT
-            const success = await scraper.waitForLogin(msg.data?.timeout);
-            console.log('success: ', success)
-            if (!success) {
+            // START A LOGIN POOLING
+            const loginSuccess = await scraper.waitForUserLogin();
+            if (!loginSuccess) {
               const message: WSMessage = {
                 type: 'timeout',
               };
-              return ws.send(JSON.stringify(message));
-            }
-            
-            const fullName = await scraper.getFullName();
-            console.log('fullName: ', fullName)
-            if (fullName instanceof Error) {
-              const message: WSMessage<{ message: string }> = {
-                type: 'error',
-                data: {
-                  message: fullName.message,
-                },
-              };
-              return ws.send(JSON.stringify(message));
+              ws.send(JSON.stringify(message));
             }
 
-            await scraper.setItemOnLocalStorage('fullName', fullName);
-            const message: WSMessage<{ fullName: string }> = {
+            const fullName = await scraper.fetchUserFullName();
+            const message: WSMessage<{ user: { fullName: string } }> = {
               type: 'login_success',
               data: {
-                fullName,
+                user: {
+                  fullName,
+                },
               },
             };
-            return ws.send(JSON.stringify(message));
+
+            ws.send(JSON.stringify(message));
           } catch (error) {
             const message: WSMessage<{ message: string }> = {
               type: 'error',
               data: {
                 message:
-                  error instanceof Error ? error.message : 'Unknown error',
+                  error instanceof Error ? error.message : 'Unknown error.',
               },
             };
-            return ws.send(JSON.stringify(message));
+
+            ws.send(JSON.stringify(message));
           }
       }
     },
   })
   .onBeforeHandle(async () => {
-    const result = await scraper.isUserAuthenticated();
-    if (result instanceof Error) {
-      return error('Unauthorized', {
-        message: result.message,
-      });
-    }
+    try {
+      const result = await scraper.checkAuthentication();
 
-    if (result === false) {
-      return error('Unauthorized', { message: 'User not authenticated.' });
+      if (result === false) {
+        return error('Unauthorized', { message: 'User not authenticated.' });
+      }
+    } catch (e) {
+      return error('Internal Server Error', {
+        message: e instanceof Error ? e.message : 'Unknown error.',
+      });
     }
   })
   .post('/channels', async () => {
@@ -93,7 +79,7 @@ new Elysia()
   });
 
 process.on('SIGINT', async () => {
-  const scraper = await Scraper.getInstance();
-  await scraper.close();
+  const scraper = await TelegramScraper.createInstance();
+  await scraper.closeInstance();
   process.exit();
 });

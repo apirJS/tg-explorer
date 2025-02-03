@@ -1,270 +1,263 @@
 import { Browser, LaunchOptions, Page } from 'puppeteer';
 import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from './lib/const';
 import path from 'path';
-import { isIDBOperationSuccess } from './lib/utils';
-import { IDBOperationResult } from './lib/types';
+import { formatFullName } from './lib/utils';
+import { PageType } from './lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { INDEXED_DB_CONFIG } from './lib/config';
 
-class Scraper {
-  private static instance: Scraper;
+// THIS IS A SINGLETON CLASS
+// Which means, there is only one instance globally at a time.
+class TelegramScraper {
+  private static instance: TelegramScraper;
   private browser!: Browser;
-  private currentPage?: Page;
-  public localStorage?: Record<string, any>;
+  private activePage?: Page;
 
   private constructor() {}
 
-  static async getInstance(options?: LaunchOptions): Promise<Scraper> {
-    if (!Scraper.instance) {
-      Scraper.instance = new Scraper();
-      await Scraper.instance.init(options);
+  static async createInstance(
+    options?: LaunchOptions
+  ): Promise<TelegramScraper> {
+    if (!TelegramScraper.instance) {
+      TelegramScraper.instance = new TelegramScraper();
+      await TelegramScraper.instance.initializeBrowser(options);
     }
-    return Scraper.instance;
+    return TelegramScraper.instance;
   }
 
-  private async getPuppeteerDefaultArgs() {
+  private get defaultBrowserSettings(): LaunchOptions {
     return {
       defaultViewport: { width: 1280, height: 720 },
-    } as LaunchOptions;
-  }
-
-  private async init(options?: LaunchOptions) {
-    puppeteer.use(stealthPlugin());
-    this.browser = await puppeteer.launch({
-      ...this.getPuppeteerDefaultArgs(),
-      ...options,
-    });
-    await this.getPage();
-    return this.browser;
-  }
-
-  private async getPage(): Promise<Page> {
-    // If currentPage exists and is still open, return it
-    if (this.currentPage) {
-      try {
-        // Check if page is still accessible (it might be closed)
-        await this.currentPage.title(); // any simple operation
-        return this.currentPage;
-      } catch {
-        // If it throws, we'll create a new page below
-      }
-    }
-
-    // Get all pages; if none, create a new page
-    const pages = await this.browser.pages();
-    this.currentPage =
-      pages.length > 0 ? pages[0] : await this.browser.newPage();
-    return this.currentPage;
-  }
-
-  async openTelegram(type: 'a' | 'k' = 'k') {
-    const page = await this.getPage();
-    await page.goto(`${BASE_TELEGRAM_URL}/${type}/`);
-  }
-
-  async close() {
-    await this.browser.close();
-  }
-
-  async isUserAuthenticated(): Promise<boolean | Error> {
-    const page = await this.getPage();
-    const currentURL = page.url();
-    if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('k');
-      // Wait until the page's URL includes the expected domain.
-      await page.waitForFunction(
-        (url) => window.location.href.includes(url),
-        {},
-        'web.telegram.org'
-      );
-    }
-    const result = await page.evaluate(
-      async (): Promise<IDBOperationResult<{ authState: string }>> => {
-        const signal = AbortSignal.timeout(1000 * 60 * 2);
-        return Promise.race<IDBOperationResult<{ authState: string }>>([
-          new Promise((resolve, reject) => {
-            const open = indexedDB.open('tweb');
-
-            open.onerror = () =>
-              reject({ error: new Error('Failed to open DB!') });
-
-            open.onsuccess = () => {
-              const db = open.result;
-              const transaction = db.transaction('session', 'readonly');
-              const store = transaction.objectStore('session');
-              const query = store.get('authState');
-
-              query.onsuccess = () =>
-                resolve({ data: { authState: query.result['_'] } });
-              query.onerror = () =>
-                reject({ error: new Error('Failed to retrieve data!') });
-            };
-          }),
-          new Promise((_, reject) =>
-            signal.addEventListener('abort', () =>
-              reject({ error: new DOMException('AbortError', 'AbortError') })
-            )
-          ),
-        ]);
-      }
-    );
-    if (!isIDBOperationSuccess(result)) {
-      return result.error;
-    }
-
-    return result.data.authState === VALID_AUTH_STATE;
-  }
-
-  async relaunch(options: LaunchOptions) {
-    await this.browser.close();
-    this.browser = await puppeteer.launch({
-      ...this.getPuppeteerDefaultArgs(),
-      ...options,
-    });
-    this.currentPage = await this.getPage();
-  }
-
-  async getUserId() {
-    const page = await this.getPage();
-    const currentURL = page.url();
-    if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('k');
-      // Wait until the page's URL includes the expected domain.
-      await page.waitForFunction(
-        (url) => window.location.href.includes(url),
-        {},
-        'web.telegram.org'
-      );
-    }
-
-    const userId: string | null = await page.evaluate(() => {
-      const data = localStorage.getItem('user_auth');
-      return data ? JSON.parse(data).id : null;
-    });
-    console.log('userID: ', userId);
-    return userId;
-  }
-
-  async waitForLogin(timeout: number = 300_000): Promise<boolean> {
-    await this.relaunch({
       headless: false,
       userDataDir: path.resolve(__dirname, '../session'),
-      defaultViewport: { width: 1280, height: 720 },
-    });
-    await this.openTelegram('k');
-
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      let finished = false;
-      let timeoutId: Timer;
-
-      const checkAuth = async () => {
-        if (finished) return;
-
-        try {
-          const result = await this.getUserId();
-          if (result) {
-            console.log('result is catched', result);
-            finished = true;
-            clearTimeout(timeoutId); // Stop any pending timeout
-            resolve(true);
-          } else if (Date.now() - startTime >= timeout) {
-            finished = true;
-            clearTimeout(timeoutId);
-            reject(false);
-          } else {
-            timeoutId = setTimeout(checkAuth, 1000);
-          }
-        } catch (error) {
-          finished = true;
-          clearTimeout(timeoutId);
-          console.error(error);
-          reject(false);
-        }
-      };
-
-      checkAuth();
-    });
+    };
   }
 
-  async getFullName() {
-    console.log('getting fullname');
-    const page = await this.getPage();
-    const currentURL = page.url();
-    if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('k');
-      // Wait until the page's URL includes the expected domain.
+  private async initializeBrowser(options?: LaunchOptions): Promise<void> {
+    try {
+      puppeteer.use(stealthPlugin());
+      this.browser = await puppeteer.launch({
+        ...this.defaultBrowserSettings,
+        ...options,
+      });
+      await this.obtainFreshPage();
+    } catch (error) {
+      throw new Error(
+        `Browser initialization failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  private async obtainFreshPage(): Promise<Page> {
+    if (this.activePage && !this.activePage.isClosed()) {
+      return this.activePage;
+    }
+
+    const [existingPage] = await this.browser.pages();
+    this.activePage = existingPage || (await this.browser.newPage());
+    return this.activePage;
+  }
+
+  private async ensureTelegramPage(authType: PageType = 'k'): Promise<void> {
+    const page = await this.obtainFreshPage();
+    if (!page.url().includes('web.telegram.org')) {
+      await page.goto(`${BASE_TELEGRAM_URL}/${authType}/`);
       await page.waitForFunction(
-        (url) => window.location.href.includes(url),
+        (expectedUrl) => window.location.href.includes(expectedUrl),
         {},
         'web.telegram.org'
       );
     }
-
-    const userId = await this.getUserId();
-    if (userId === null) {
-      return new Error('Failed to get userId.');
-    }
-
-    const result = await page.evaluate(
-      async (userId): Promise<IDBOperationResult<{ fullName: string }>> => {
-        const signal = AbortSignal.timeout(1000 * 60 * 2);
-        return Promise.race<IDBOperationResult<{ fullName: string }>>([
-          new Promise((resolve, reject) => {
-            const open = indexedDB.open('tweb');
-
-            open.onerror = () =>
-              reject({ error: new Error('Failed to open DB!') });
-
-            open.onsuccess = () => {
-              const db = open.result;
-              const transaction = db.transaction('users', 'readonly');
-              const store = transaction.objectStore('users');
-              const query = store.get(userId);
-
-              query.onsuccess = () =>
-                resolve({
-                  data: {
-                    fullName: `${query.result['first_name']} ${
-                      query.result['last_name'] ?? ''
-                    }`,
-                  },
-                });
-              query.onerror = () =>
-                reject({ error: new Error('Failed to retrieve data!') });
-            };
-          }),
-          new Promise((_, reject) =>
-            signal.addEventListener('abort', () =>
-              reject({ error: new DOMException('AbortError', 'AbortError') })
-            )
-          ),
-        ]);
-      },
-      userId
-    );
-
-    if (!isIDBOperationSuccess(result)) {
-      return result.error;
-    }
-
-    return result.data.fullName;
   }
 
-  async setItemOnLocalStorage(key: string, value: string) {
-    const page = await this.getPage();
-    const currentURL = page.url();
-    if (!currentURL.includes('web.telegram.org')) {
-      await this.openTelegram('k');
+  async closeInstance(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
     }
+  }
 
-    await page.evaluate(
-      ([key, value]) => {
-        localStorage.setItem(key, value);
-      },
-      [key, value]
-    );
+  async relaunchBrowser(options: LaunchOptions): Promise<boolean> {
+    try {
+      if (this.browser) {
+        await this.browser.close();
+      }
+
+      await this.initializeBrowser(options);
+      return true;
+    } catch (error) {
+      throw new Error(
+        `Failed to relaunch browser: ${
+          error instanceof Error ? error.message : 'Unknown reason.'
+        }`
+      );
+    }
+  }
+
+  async navigateToTelegram(authType: PageType = 'k'): Promise<void> {
+    await this.ensureTelegramPage(authType);
+  }
+
+  private async queryIndexedDB<T>(
+    storeName: string,
+    key: string,
+    timeoutMs: number = 1000 * 60 // default one minute
+  ): Promise<T> {
+    const page = await this.obtainFreshPage();
+
+    try {
+      return await page.evaluate(
+        async ({ storeName, key }) => {
+          const abortTimeout = AbortSignal.timeout(timeoutMs);
+          return new Promise<T>((resolve, reject) => {
+            const openRequest = indexedDB.open(INDEXED_DB_CONFIG.name);
+
+            abortTimeout.addEventListener('abort', () => {
+              openRequest.onerror = null;
+              openRequest.onsuccess = null;
+              reject(new DOMException('Timeout reached', 'AbortError'));
+            });
+
+            openRequest.onerror = () => reject('Database open failed');
+            openRequest.onsuccess = () => {
+              const db = openRequest.result;
+              const transaction = db.transaction(storeName, 'readonly');
+              const store = transaction.objectStore(storeName);
+              const query = store.get(key);
+
+              query.onsuccess = () => resolve(query.result);
+              query.onerror = () => reject('Data query failed');
+            };
+          });
+        },
+        { storeName, key }
+      );
+    } catch (error) {
+      throw new Error(
+        `IndexedDB query failed: ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
+  }
+
+  async checkAuthentication(): Promise<boolean> {
+    try {
+      await this.ensureTelegramPage();
+      const authState = await this.queryIndexedDB<{ _: string }>(
+        'session',
+        'authState'
+      );
+      return authState?._ === VALID_AUTH_STATE;
+    } catch (error) {
+      throw new Error(
+        `Failed to check user credentials: ${
+          error instanceof Error ? error.message : 'Unknown reason.'
+        }`
+      );
+    }
+  }
+
+  async retrieveUserId(): Promise<string> {
+    try {
+      await this.ensureTelegramPage();
+      const page = await this.obtainFreshPage();
+
+      const userAuthData = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('user_auth') || 'null')
+      );
+
+      if (!userAuthData?.id) {
+        throw new Error('User ID not found in localStorage');
+      }
+
+      return userAuthData.id;
+    } catch (error) {
+      throw new Error(
+        `Failed to retrieve user ID: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  async waitForUserLogin(timeoutMs: number = 300_000): Promise<boolean> {
+    try {
+      await this.relaunchBrowser({ headless: false });
+      return await new Promise((resolve, reject) => {
+        let timeoutId: Timer | null = null;
+        const startTime = Date.now();
+
+        const checkLoop = async () => {
+          try {
+            const userId = await this.retrieveUserId();
+            if (userId) {
+              resolve(true);
+              return;
+            }
+
+            if (Date.now() - startTime > timeoutMs) {
+              reject(false);
+              return;
+            }
+
+            timeoutId = setTimeout(checkLoop, 1000);
+          } catch (error) {
+            throw new Error(
+              `Failed to check for user login state: ${
+                error instanceof Error ? error.message : 'Unknown reason.'
+              }`
+            );
+          } finally {
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+          }
+        };
+
+        checkLoop();
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to check for user login state: ${
+          error instanceof Error ? error.message : 'Unknown reason.'
+        }`
+      );
+    }
+  }
+
+  async fetchUserFullName(): Promise<string> {
+    try {
+      const userId = await this.retrieveUserId();
+      const userData = await this.queryIndexedDB<{
+        first_name: string;
+        last_name?: string;
+      }>('users', userId);
+
+      return formatFullName(userData.first_name, userData.last_name);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch full name: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  async updateLocalStorage(key: string, value: string): Promise<void> {
+    try {
+      const page = await this.obtainFreshPage();
+      await page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, value]);
+    } catch (error) {
+      throw new Error(
+        `LocalStorage update failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
   }
 }
 
-export default Scraper;
+export default TelegramScraper;
