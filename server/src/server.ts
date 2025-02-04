@@ -2,6 +2,7 @@ import { Elysia, error } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { WSMessage } from './lib/types';
 import TelegramScraper from './scraper';
+import { DEFAULT_TIMEOUT } from './lib/const';
 
 const scraper = await TelegramScraper.createInstance({ headless: true });
 
@@ -25,7 +26,8 @@ new Elysia()
             }
 
             // START A LOGIN POOLING
-            const loginSuccess = await scraper.waitForUserLogin();
+            const timeoutMs: number = msg.data?.timeoutMs ?? DEFAULT_TIMEOUT;
+            const loginSuccess = await scraper.waitForUserLogin(timeoutMs);
             if (!loginSuccess) {
               const message: WSMessage = {
                 type: 'timeout',
@@ -34,6 +36,7 @@ new Elysia()
             }
 
             const fullName = await scraper.fetchUserFullName();
+            await scraper.updateLocalStorage('fullName', fullName);
             const message: WSMessage<{ user: { fullName: string } }> = {
               type: 'login_success',
               data: {
@@ -55,6 +58,7 @@ new Elysia()
 
             ws.send(JSON.stringify(message));
           }
+          break;
       }
     },
   })

@@ -1,11 +1,16 @@
-import { Browser, LaunchOptions, Page } from 'puppeteer';
-import { BASE_TELEGRAM_URL, VALID_AUTH_STATE } from './lib/const';
+import { Browser, LaunchOptions, Mouse, Page } from 'puppeteer';
+import {
+  BASE_TELEGRAM_URL,
+  DEFAULT_TIMEOUT,
+  VALID_AUTH_STATE,
+} from './lib/const';
 import path from 'path';
 import { formatFullName } from './lib/utils';
 import { PageType } from './lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { INDEXED_DB_CONFIG } from './lib/config';
+import selectors from './lib/selectors';
 
 // THIS IS A SINGLETON CLASS
 // Which means, there is only one instance globally at a time.
@@ -61,16 +66,17 @@ class TelegramScraper {
     return this.activePage;
   }
 
-  private async ensureTelegramPage(authType: PageType = 'k'): Promise<void> {
+  private async ensureTelegramPage(pageType: PageType = 'k'): Promise<Page> {
     const page = await this.obtainFreshPage();
     if (!page.url().includes('web.telegram.org')) {
-      await page.goto(`${BASE_TELEGRAM_URL}/${authType}/`);
+      await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
       await page.waitForFunction(
         (expectedUrl) => window.location.href.includes(expectedUrl),
         {},
         'web.telegram.org'
       );
     }
+    return page;
   }
 
   async closeInstance(): Promise<void> {
@@ -96,8 +102,21 @@ class TelegramScraper {
     }
   }
 
-  async navigateToTelegram(authType: PageType = 'k'): Promise<void> {
-    await this.ensureTelegramPage(authType);
+  async navigateToTelegram(pageType: PageType = 'k'): Promise<void> {
+    await this.ensureTelegramPage(pageType);
+  }
+
+  private async navigateToTelegramHomePage(
+    pageType: PageType = 'k'
+  ): Promise<Page> {
+    const page = await this.obtainFreshPage();
+    await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
+    await page.waitForFunction(
+      (expectedUrl) => window.location.href.includes(expectedUrl),
+      {},
+      'web.telegram.org'
+    );
+    return page;
   }
 
   private async queryIndexedDB<T>(
@@ -183,7 +202,9 @@ class TelegramScraper {
     }
   }
 
-  async waitForUserLogin(timeoutMs: number = 300_000): Promise<boolean> {
+  async waitForUserLogin(
+    timeoutMs: number = DEFAULT_TIMEOUT
+  ): Promise<boolean> {
     try {
       await this.relaunchBrowser({ headless: false });
       return await new Promise((resolve, reject) => {
@@ -254,6 +275,72 @@ class TelegramScraper {
       throw new Error(
         `LocalStorage update failed: ${
           error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  private async checkForChannel(userId: string): Promise<boolean> {
+    try {
+      const page = await this.navigateToTelegramHomePage();
+      const searchTarget = `tg-explorer-${userId}`;
+
+      // Dispatch FocusEvent to the input element to trigger the search helper list
+      await page.evaluate((selectors) => {
+        const focusEvent = new FocusEvent('focus');
+        const inputElement: null | HTMLInputElement = document.querySelector(
+          selectors.k.home.SEARCH_INPUT.selector
+        );
+
+        if (inputElement === null) {
+          throw new Error('Search input element not found.');
+        }
+
+        inputElement.dispatchEvent(focusEvent);
+      }, selectors);
+
+      // Begin to search the channel
+      await page.type(selectors.k.home.SEARCH_INPUT.selector, searchTarget);
+
+      const isChannelExists = await page.evaluate((selectors) => {
+        const chatList = document.querySelectorAll(
+          selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
+        );
+
+        if (chatList.length === 0) {
+          return false;
+        }
+
+        chatList.forEach((chat) => {
+          if (chat.innerHTML.trim() === searchTarget.trim()) {
+            return true;
+          }
+        });
+
+        return false;
+      }, selectors);
+
+      return isChannelExists;
+    } catch (error) {
+      throw new Error(
+        `Failed to check for the channel existence: ${
+          error instanceof Error ? error.message : 'unknown error.'
+        }`
+      );
+    }
+  }
+
+  async createChannel(): Promise<boolean> {
+    try {
+      const userId = await this.retrieveUserId();
+      const isChannelExists = await this.checkForChannel(userId);
+      if (isChannelExists) {
+        throw new Error('Channel already exists.');
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to create channel: ${
+          error instanceof Error ? error.message : 'unknown error.'
         }`
       );
     }
