@@ -333,10 +333,69 @@ class TelegramScraper {
   async createChannel(): Promise<boolean> {
     try {
       const userId = await this.retrieveUserId();
-      const isChannelExists = await this.checkForChannel(userId);
+      let isChannelExists = await this.checkForChannel(userId);
+      const channelName = `tg-explorer-${userId}`;
+
       if (isChannelExists) {
         throw new Error('Channel already exists.');
       }
+      const page = await this.navigateToTelegramHomePage();
+
+      await page.evaluate(
+        (selectors, channelName) => {
+          const penIconButton: HTMLButtonElement | null =
+            document.querySelector(selectors.k.home.PEN_ICON_BUTTON.selector);
+          if (penIconButton === null) {
+            throw new Error('Pen icon button not found');
+          }
+
+          penIconButton.click();
+
+          const newChannelMenuItem: HTMLDivElement | null =
+            document.querySelector(
+              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector
+            );
+          if (newChannelMenuItem === null) {
+            throw new Error('New channel menu item not found');
+          }
+
+          newChannelMenuItem.click();
+
+          const channelNameInput: HTMLDivElement | null =
+            document.querySelector(
+              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON
+                .CHANNEL_NAME_INPUT.selector
+            );
+          if (channelNameInput === null) {
+            throw new Error('Channel name input not found');
+          }
+
+          if (channelNameInput.classList.contains('is-empty')) {
+            channelNameInput.classList.remove('is-empty');
+          }
+
+          channelNameInput.innerHTML = channelName;
+
+          const continueButton: HTMLButtonElement | null =
+            document.querySelector(
+              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON
+                .CONTINUE_BUTTON.selector
+            );
+          if (continueButton === null) {
+            throw new Error('Continue button not found');
+          }
+
+          if (!continueButton.classList.contains('is-visible')) {
+            continueButton.classList.add('is-visible');
+          }
+
+          continueButton.click();
+        },
+        selectors,
+        channelName
+      );
+
+      return await this.checkForChannel(userId);
     } catch (error) {
       throw new Error(
         `Failed to create channel: ${
