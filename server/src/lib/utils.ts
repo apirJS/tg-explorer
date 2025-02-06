@@ -27,10 +27,6 @@ export function isSessionFolderExists(): boolean {
   return fs.existsSync(folder);
 }
 
-export async function initializeScraper(options?: LaunchOptions) {
-  return await Scraper.getInstance(options);
-}
-
 export function isIDBOperationSuccess<T = any>(
   result: IDBOperationResult<T>
 ): result is IDBOperationSuccess<T> {
@@ -39,4 +35,22 @@ export function isIDBOperationSuccess<T = any>(
 
 export function formatFullName(firstName: string, lastName?: string): string {
   return `${firstName} ${lastName}`.trim();
+}
+
+export function formatChannelName(userId: string): string {
+  return `tg-explorer-${userId}`;
+}
+
+export function formatErrorMessage(
+  title: string,
+  error: unknown,
+  message?: string
+): string {
+  const errorMessage =
+    message ||
+    (error instanceof Error ||
+    (typeof error === 'object' && error !== null && 'message' in error)
+      ? (error as Error).message
+      : 'Unknown Error.');
+  return `${title}: ${errorMessage}`;
 }

@@ -1,19 +1,25 @@
-import { Browser, LaunchOptions, Mouse, Page } from 'puppeteer';
+import { Browser, LaunchOptions, Page } from 'puppeteer';
 import {
   BASE_TELEGRAM_URL,
   DEFAULT_TIMEOUT,
   VALID_AUTH_STATE,
 } from './lib/const';
 import path from 'path';
-import { formatFullName } from './lib/utils';
+import {
+  formatChannelName,
+  formatFullName,
+  formatErrorMessage,
+} from './lib/utils';
 import { PageType } from './lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { INDEXED_DB_CONFIG } from './lib/config';
 import selectors from './lib/selectors';
 
+//
 // THIS IS A SINGLETON CLASS
 // Which means, there is only one instance globally at a time.
+//
 class TelegramScraper {
   private static instance: TelegramScraper;
   private browser!: Browser;
@@ -49,9 +55,7 @@ class TelegramScraper {
       await this.obtainFreshPage();
     } catch (error) {
       throw new Error(
-        `Browser initialization failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
+        formatErrorMessage('Browser initialization failed', error)
       );
     }
   }
@@ -67,21 +71,31 @@ class TelegramScraper {
   }
 
   private async ensureTelegramPage(pageType: PageType = 'k'): Promise<Page> {
-    const page = await this.obtainFreshPage();
-    if (!page.url().includes('web.telegram.org')) {
-      await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
-      await page.waitForFunction(
-        (expectedUrl) => window.location.href.includes(expectedUrl),
-        {},
-        'web.telegram.org'
+    try {
+      const page = await this.obtainFreshPage();
+      if (!page.url().includes('web.telegram.org')) {
+        await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
+        await page.waitForFunction(
+          (expectedUrl) => window.location.href.includes(expectedUrl),
+          {},
+          'web.telegram.org'
+        );
+      }
+      return page;
+    } catch (error) {
+      throw new Error(
+        formatErrorMessage('Failed to ensures Telegram page', error)
       );
     }
-    return page;
   }
 
   async closeInstance(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close();
+    try {
+      if (this.browser) {
+        await this.browser.close();
+      }
+    } catch (error) {
+      throw new Error(formatErrorMessage('Failed to close browser', error));
     }
   }
 
@@ -94,11 +108,7 @@ class TelegramScraper {
       await this.initializeBrowser(options);
       return true;
     } catch (error) {
-      throw new Error(
-        `Failed to relaunch browser: ${
-          error instanceof Error ? error.message : 'Unknown reason.'
-        }`
-      );
+      throw new Error(formatErrorMessage('Failed to relaunch browser', error));
     }
   }
 
@@ -109,14 +119,20 @@ class TelegramScraper {
   private async navigateToTelegramHomePage(
     pageType: PageType = 'k'
   ): Promise<Page> {
-    const page = await this.obtainFreshPage();
-    await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
-    await page.waitForFunction(
-      (expectedUrl) => window.location.href.includes(expectedUrl),
-      {},
-      'web.telegram.org'
-    );
-    return page;
+    try {
+      const page = await this.obtainFreshPage();
+      await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`);
+      await page.waitForFunction(
+        (expectedUrl) => window.location.href.includes(expectedUrl),
+        {},
+        'web.telegram.org'
+      );
+      return page;
+    } catch (error) {
+      throw new Error(
+        formatErrorMessage("Failed to navigate to Telegram's homepage", error)
+      );
+    }
   }
 
   private async queryIndexedDB<T>(
@@ -154,11 +170,7 @@ class TelegramScraper {
         { storeName, key }
       );
     } catch (error) {
-      throw new Error(
-        `IndexedDB query failed: ${
-          error instanceof Error ? error.message : error
-        }`
-      );
+      throw new Error(formatErrorMessage('Failed to query IndexedDB', error));
     }
   }
 
@@ -172,9 +184,7 @@ class TelegramScraper {
       return authState?._ === VALID_AUTH_STATE;
     } catch (error) {
       throw new Error(
-        `Failed to check user credentials: ${
-          error instanceof Error ? error.message : 'Unknown reason.'
-        }`
+        formatErrorMessage('Failed to check user credentials', error)
       );
     }
   }
@@ -194,11 +204,7 @@ class TelegramScraper {
 
       return userAuthData.id;
     } catch (error) {
-      throw new Error(
-        `Failed to retrieve user ID: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      );
+      throw new Error(formatErrorMessage('Failed to retrieve user ID', error));
     }
   }
 
@@ -242,9 +248,7 @@ class TelegramScraper {
       });
     } catch (error) {
       throw new Error(
-        `Failed to check for user login state: ${
-          error instanceof Error ? error.message : 'Unknown reason.'
-        }`
+        formatErrorMessage('Failed to check for user login state', error)
       );
     }
   }
@@ -259,11 +263,7 @@ class TelegramScraper {
 
       return formatFullName(userData.first_name, userData.last_name);
     } catch (error) {
-      throw new Error(
-        `Failed to fetch full name: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
-      );
+      throw new Error(formatErrorMessage('Failed to fetch full name', error));
     }
   }
 
@@ -272,10 +272,17 @@ class TelegramScraper {
       const page = await this.obtainFreshPage();
       await page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, value]);
     } catch (error) {
+      throw new Error(formatErrorMessage('LocalStorage update failed', error));
+    }
+  }
+
+  async getLocalStorageItem(key: string): Promise<string | null> {
+    try {
+      const page = await this.ensureTelegramPage();
+      return await page.evaluate((key) => localStorage.getItem(key), key);
+    } catch (error) {
       throw new Error(
-        `LocalStorage update failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`
+        formatErrorMessage('Failed to retrieve item from localstorage', error)
       );
     }
   }
@@ -283,7 +290,7 @@ class TelegramScraper {
   private async checkForChannel(userId: string): Promise<boolean> {
     try {
       const page = await this.navigateToTelegramHomePage();
-      const searchTarget = `tg-explorer-${userId}`;
+      const searchTarget = formatChannelName(userId);
 
       // Dispatch FocusEvent to the input element to trigger the search helper list
       await page.evaluate((selectors) => {
@@ -323,9 +330,7 @@ class TelegramScraper {
       return isChannelExists;
     } catch (error) {
       throw new Error(
-        `Failed to check for the channel existence: ${
-          error instanceof Error ? error.message : 'unknown error.'
-        }`
+        formatErrorMessage('Failed to check for the channel existence', error)
       );
     }
   }
@@ -333,15 +338,15 @@ class TelegramScraper {
   async createChannel(): Promise<boolean> {
     try {
       const userId = await this.retrieveUserId();
-      let isChannelExists = await this.checkForChannel(userId);
-      const channelName = `tg-explorer-${userId}`;
+      const isChannelExists = await this.checkForChannel(userId);
+      const channelName = formatChannelName(userId);
 
       if (isChannelExists) {
         throw new Error('Channel already exists.');
       }
-      const page = await this.navigateToTelegramHomePage();
 
-      await page.evaluate(
+      const page = await this.navigateToTelegramHomePage();
+      const channelUrl = await page.evaluate(
         (selectors, channelName) => {
           const penIconButton: HTMLButtonElement | null =
             document.querySelector(selectors.k.home.PEN_ICON_BUTTON.selector);
@@ -390,18 +395,23 @@ class TelegramScraper {
           }
 
           continueButton.click();
+          return window.location.href;
         },
         selectors,
         channelName
       );
 
+      await this.updateLocalStorage('channelUrl', channelUrl);
       return await this.checkForChannel(userId);
     } catch (error) {
-      throw new Error(
-        `Failed to create channel: ${
-          error instanceof Error ? error.message : 'unknown error.'
-        }`
-      );
+      throw new Error(formatErrorMessage('Failed to create channel', error));
+    }
+  }
+
+  async navigateToChannel(): Promise<boolean> {
+    const channelUrl = await this.getLocalStorageItem("channelUrl");
+    if (channelUrl) {
+      
     }
   }
 }
