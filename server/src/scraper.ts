@@ -6,11 +6,12 @@ import {
 } from './lib/const';
 import path from 'path';
 import {
-  formatChannelName,
+  getChannelName,
   formatFullName,
   formatErrorMessage,
+  generateTelegramChatUrl,
 } from './lib/utils';
-import { PageType } from './lib/types';
+import { ChannelInfo, PageType } from './lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { INDEXED_DB_CONFIG } from './lib/config';
@@ -61,13 +62,17 @@ class TelegramScraper {
   }
 
   private async obtainFreshPage(): Promise<Page> {
-    if (this.activePage && !this.activePage.isClosed()) {
-      return this.activePage;
-    }
+    try {
+      if (this.activePage && !this.activePage.isClosed()) {
+        return this.activePage;
+      }
 
-    const [existingPage] = await this.browser.pages();
-    this.activePage = existingPage || (await this.browser.newPage());
-    return this.activePage;
+      const [existingPage] = await this.browser.pages();
+      this.activePage = existingPage || (await this.browser.newPage());
+      return this.activePage;
+    } catch (error) {
+      throw new Error(formatErrorMessage('Failed to obtain fresh page', error));
+    }
   }
 
   private async ensureTelegramPage(pageType: PageType = 'k'): Promise<Page> {
@@ -287,19 +292,18 @@ class TelegramScraper {
     }
   }
 
-  private async checkForChannel(userId: string): Promise<boolean> {
+  private async getChannelInfo(channelName: string): Promise<ChannelInfo> {
     try {
       const page = await this.navigateToTelegramHomePage();
-      const searchTarget = formatChannelName(userId);
 
       // Dispatch FocusEvent to the input element to trigger the search helper list
       await page.evaluate((selectors) => {
         const focusEvent = new FocusEvent('focus');
-        const inputElement: null | HTMLInputElement = document.querySelector(
+        const inputElement: HTMLInputElement | null = document.querySelector(
           selectors.k.home.SEARCH_INPUT.selector
         );
 
-        if (inputElement === null) {
+        if (!inputElement) {
           throw new Error('Search input element not found.');
         }
 
@@ -307,27 +311,49 @@ class TelegramScraper {
       }, selectors);
 
       // Begin to search the channel
-      await page.type(selectors.k.home.SEARCH_INPUT.selector, searchTarget);
+      await page.type(selectors.k.home.SEARCH_INPUT.selector, channelName);
 
-      const isChannelExists = await page.evaluate((selectors) => {
-        const chatList = document.querySelectorAll(
-          selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
-        );
+      const result: ChannelInfo = await page.evaluate(
+        (selectors, channelName) => {
+          const chatList: NodeListOf<HTMLSpanElement> =
+            document.querySelectorAll(
+              selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
+            );
 
-        if (chatList.length === 0) {
-          return false;
-        }
-
-        chatList.forEach((chat) => {
-          if (chat.innerHTML.trim() === searchTarget.trim()) {
-            return true;
+          if (chatList.length === 0) {
+            return {
+              isChannelExists: false,
+              channelName: null,
+              peerId: null,
+            } as const;
           }
-        });
 
-        return false;
-      }, selectors);
+          for (const chat of chatList) {
+            if (chat.innerHTML.trim() === channelName) {
+              const peerId = chat.getAttribute('data-peer-id');
+              if (!peerId) {
+                throw new Error('Cannot retrieve peerId');
+              }
 
-      return isChannelExists;
+              return {
+                isChannelExists: true,
+                channelName: chat.innerHTML.trim(),
+                peerId,
+              } as const;
+            }
+          }
+
+          return {
+            isChannelExists: false,
+            channelName: null,
+            peerId: null,
+          } as const;
+        },
+        selectors,
+        channelName
+      );
+
+      return result;
     } catch (error) {
       throw new Error(
         formatErrorMessage('Failed to check for the channel existence', error)
@@ -338,10 +364,10 @@ class TelegramScraper {
   async createChannel(): Promise<boolean> {
     try {
       const userId = await this.retrieveUserId();
-      const isChannelExists = await this.checkForChannel(userId);
-      const channelName = formatChannelName(userId);
+      const channelName = getChannelName(userId);
+      const channelInfo = await this.getChannelInfo(channelName);
 
-      if (isChannelExists) {
+      if (!channelInfo.isChannelExists) {
         throw new Error('Channel already exists.');
       }
 
@@ -402,16 +428,35 @@ class TelegramScraper {
       );
 
       await this.updateLocalStorage('channelUrl', channelUrl);
-      return await this.checkForChannel(userId);
+      return (await this.getChannelInfo(channelName)).isChannelExists;
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to create channel', error));
     }
   }
 
   async navigateToChannel(): Promise<boolean> {
-    const channelUrl = await this.getLocalStorageItem("channelUrl");
-    if (channelUrl) {
-      
+    try {
+      const userId = await this.retrieveUserId();
+      const channelName = getChannelName(userId);
+      const channelInfo = await this.getChannelInfo(channelName);
+      if (!channelInfo.isChannelExists) {
+        throw new Error(`Channel "${channelName}" didn't exists`);
+      }
+
+      const page = await this.obtainFreshPage();
+      const localChannelUrl = await this.getLocalStorageItem('channelUrl');
+      if (localChannelUrl) {
+        await page.goto(localChannelUrl);
+        return true;
+      }
+
+      const channelUrl = generateTelegramChatUrl(channelInfo.peerId);
+      await page.goto(channelUrl);
+      return true;
+    } catch (error) {
+      throw new Error(
+        formatErrorMessage('Failed to navigate to channel', error)
+      );
     }
   }
 }

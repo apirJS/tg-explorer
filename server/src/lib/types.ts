@@ -17,3 +17,14 @@ export type IDBOperationFailed = { error: Error | DOMException };
 export type IDBOperationResult<T> = IDBOperationFailed | IDBOperationSuccess<T>;
 
 export type PageType = 'k' | 'a';
+export type ChannelInfo =
+  | {
+      isChannelExists: true;
+      channelName: string;
+      peerId: string;
+    }
+  | {
+      isChannelExists: false;
+      channelName: null;
+      peerId: null;
+    };

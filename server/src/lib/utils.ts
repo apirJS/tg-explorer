@@ -2,7 +2,8 @@ import { LaunchOptions, Page } from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import Scraper from '../scraper';
-import { IDBOperationResult, IDBOperationSuccess } from './types';
+import { IDBOperationResult, IDBOperationSuccess, PageType } from './types';
+import { BASE_TELEGRAM_URL } from './const';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -37,7 +38,7 @@ export function formatFullName(firstName: string, lastName?: string): string {
   return `${firstName} ${lastName}`.trim();
 }
 
-export function formatChannelName(userId: string): string {
+export function getChannelName(userId: string): string {
   return `tg-explorer-${userId}`;
 }
 
@@ -53,4 +54,11 @@ export function formatErrorMessage(
       ? (error as Error).message
       : 'Unknown Error.');
   return `${title}: ${errorMessage}`;
+}
+
+export function generateTelegramChatUrl(
+  peerId: string,
+  pageType: PageType = 'k'
+) {
+  return `${BASE_TELEGRAM_URL}/${pageType}/#${peerId}`;
 }
