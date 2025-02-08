@@ -160,7 +160,7 @@ class TelegramScraper {
               reject(new DOMException('Timeout reached', 'AbortError'));
             });
 
-            openRequest.onerror = () => reject('Database open failed');
+            openRequest.onerror = () => reject(new Error('Database open failed'));
             openRequest.onsuccess = () => {
               const db = openRequest.result;
               const transaction = db.transaction(storeName, 'readonly');
@@ -168,7 +168,7 @@ class TelegramScraper {
               const query = store.get(key);
 
               query.onsuccess = () => resolve(query.result);
-              query.onerror = () => reject('Data query failed');
+              query.onerror = () => reject(new Error('Data query failed'));
             };
           });
         },
@@ -189,7 +189,7 @@ class TelegramScraper {
       return authState?._ === VALID_AUTH_STATE;
     } catch (error) {
       throw new Error(
-        formatErrorMessage('Failed to check user credentials', error)
+        formatErrorMessage('Failed to check for user credentials', error)
       );
     }
   }
@@ -459,6 +459,8 @@ class TelegramScraper {
       );
     }
   }
+
+  
 }
 
 export default TelegramScraper;

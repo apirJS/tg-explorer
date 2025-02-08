@@ -31,6 +31,12 @@ const selectors = {
         },
       },
     },
+    channel: {
+      MESSAGES: {
+        selector: "section.bubbles-date-group > div.bubbles-group > div",
+        isNodeList: true,
+      }
+    }
   },
 };
 
