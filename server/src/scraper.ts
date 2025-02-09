@@ -1,7 +1,8 @@
 import { Browser, LaunchOptions, Page } from 'puppeteer';
 import {
   BASE_TELEGRAM_URL,
-  DEFAULT_TIMEOUT,
+  DEFAULT_CLICK_DELAY_MS,
+  DEFAULT_LOGIN_TIMEOUT_MS,
   VALID_AUTH_STATE,
 } from './lib/const';
 import path from 'path';
@@ -10,6 +11,7 @@ import {
   formatFullName,
   formatErrorMessage,
   generateTelegramChatUrl,
+  disableAnimation,
 } from './lib/utils';
 import { ChannelInfo, PageType } from './lib/types';
 import puppeteer from 'puppeteer-extra';
@@ -43,6 +45,7 @@ class TelegramScraper {
       defaultViewport: { width: 1280, height: 720 },
       headless: false,
       userDataDir: path.resolve(__dirname, '../session'),
+      args: ['--start-maximized'],
     };
   }
 
@@ -90,6 +93,28 @@ class TelegramScraper {
     } catch (error) {
       throw new Error(
         formatErrorMessage('Failed to ensures Telegram page', error)
+      );
+    }
+  }
+
+  private async ensureTelegramHomePage(
+    pageType: PageType = 'k'
+  ): Promise<Page> {
+    try {
+      const page = await this.obtainFreshPage();
+      const telegramHomePageUrl = `${BASE_TELEGRAM_URL}/${pageType}/`;
+      if (page.url() !== telegramHomePageUrl) {
+        await page.goto(telegramHomePageUrl);
+        await page.waitForFunction(
+          (expectedUrl) => window.location.href.includes(expectedUrl),
+          {},
+          'web.telegram.org'
+        );
+      }
+      return page;
+    } catch (error) {
+      throw new Error(
+        formatErrorMessage('Failed to ensures Telegram home page', error)
       );
     }
   }
@@ -152,7 +177,7 @@ class TelegramScraper {
         async ({ storeName, key }) => {
           const abortTimeout = AbortSignal.timeout(timeoutMs);
           return new Promise<T>((resolve, reject) => {
-            const openRequest = indexedDB.open(INDEXED_DB_CONFIG.name);
+            const openRequest = indexedDB.open(INDEXED_DB_CONFIG.DATABASE_NAME);
 
             abortTimeout.addEventListener('abort', () => {
               openRequest.onerror = null;
@@ -160,7 +185,8 @@ class TelegramScraper {
               reject(new DOMException('Timeout reached', 'AbortError'));
             });
 
-            openRequest.onerror = () => reject(new Error('Database open failed'));
+            openRequest.onerror = () =>
+              reject(new Error('Database open failed'));
             openRequest.onsuccess = () => {
               const db = openRequest.result;
               const transaction = db.transaction(storeName, 'readonly');
@@ -214,7 +240,7 @@ class TelegramScraper {
   }
 
   async waitForUserLogin(
-    timeoutMs: number = DEFAULT_TIMEOUT
+    timeoutMs: number = DEFAULT_LOGIN_TIMEOUT_MS
   ): Promise<boolean> {
     try {
       await this.relaunchBrowser({ headless: false });
@@ -297,6 +323,7 @@ class TelegramScraper {
       const page = await this.navigateToTelegramHomePage();
 
       // Dispatch FocusEvent to the input element to trigger the search helper list
+      await page.waitForSelector(selectors.k.home.SEARCH_INPUT.selector);
       await page.evaluate((selectors) => {
         const focusEvent = new FocusEvent('focus');
         const inputElement: HTMLInputElement | null = document.querySelector(
@@ -322,7 +349,7 @@ class TelegramScraper {
 
           if (chatList.length === 0) {
             return {
-              isChannelExists: false,
+              channelExists: false,
               channelName: null,
               peerId: null,
             } as const;
@@ -336,7 +363,7 @@ class TelegramScraper {
               }
 
               return {
-                isChannelExists: true,
+                channelExists: true,
                 channelName: chat.innerHTML.trim(),
                 peerId,
               } as const;
@@ -344,7 +371,7 @@ class TelegramScraper {
           }
 
           return {
-            isChannelExists: false,
+            channelExists: false,
             channelName: null,
             peerId: null,
           } as const;
@@ -367,68 +394,22 @@ class TelegramScraper {
       const channelName = getChannelName(userId);
       const channelInfo = await this.getChannelInfo(channelName);
 
-      if (!channelInfo.isChannelExists) {
+      if (channelInfo.channelExists) {
         throw new Error('Channel already exists.');
       }
 
+      console.log(channelInfo);
+
       const page = await this.navigateToTelegramHomePage();
-      const channelUrl = await page.evaluate(
-        (selectors, channelName) => {
-          const penIconButton: HTMLButtonElement | null =
-            document.querySelector(selectors.k.home.PEN_ICON_BUTTON.selector);
-          if (penIconButton === null) {
-            throw new Error('Pen icon button not found');
-          }
+      disableAnimation(page);
 
-          penIconButton.click();
+      await page.waitForSelector(selectors.k.home.PEN_ICON_BUTTON.selector);
+      await page.click(selectors.k.home.PEN_ICON_BUTTON.selector, {
+        delay: DEFAULT_CLICK_DELAY_MS,
+      });
 
-          const newChannelMenuItem: HTMLDivElement | null =
-            document.querySelector(
-              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector
-            );
-          if (newChannelMenuItem === null) {
-            throw new Error('New channel menu item not found');
-          }
-
-          newChannelMenuItem.click();
-
-          const channelNameInput: HTMLDivElement | null =
-            document.querySelector(
-              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON
-                .CHANNEL_NAME_INPUT.selector
-            );
-          if (channelNameInput === null) {
-            throw new Error('Channel name input not found');
-          }
-
-          if (channelNameInput.classList.contains('is-empty')) {
-            channelNameInput.classList.remove('is-empty');
-          }
-
-          channelNameInput.innerHTML = channelName;
-
-          const continueButton: HTMLButtonElement | null =
-            document.querySelector(
-              selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON
-                .CONTINUE_BUTTON.selector
-            );
-          if (continueButton === null) {
-            throw new Error('Continue button not found');
-          }
-
-          if (!continueButton.classList.contains('is-visible')) {
-            continueButton.classList.add('is-visible');
-          }
-
-          continueButton.click();
-          return window.location.href;
-        },
-        selectors,
-        channelName
-      );
-
-      await this.updateLocalStorage('channelUrl', channelUrl);
-      return (await this.getChannelInfo(channelName)).isChannelExists;
+      // await this.updateLocalStorage('channelUrl', channelUrl);
+      return (await this.getChannelInfo(channelName)).channelExists;
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to create channel', error));
     }
@@ -439,7 +420,7 @@ class TelegramScraper {
       const userId = await this.retrieveUserId();
       const channelName = getChannelName(userId);
       const channelInfo = await this.getChannelInfo(channelName);
-      if (!channelInfo.isChannelExists) {
+      if (!channelInfo.channelExists) {
         throw new Error(`Channel "${channelName}" didn't exists`);
       }
 
@@ -460,7 +441,21 @@ class TelegramScraper {
     }
   }
 
-  
+  private async isChannelExists(peerId: string): Promise<boolean> {
+    try {
+      try {
+        await this.queryIndexedDB('chats', peerId);
+        return true;
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Data query failed') {
+          return false;
+        }
+        throw new Error('Error on querying data');
+      }
+    } catch (error) {
+      throw new Error(formatErrorMessage('Failed to check for channel', error));
+    }
+  }
 }
 
 export default TelegramScraper;

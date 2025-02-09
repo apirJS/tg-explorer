@@ -19,12 +19,12 @@ export type IDBOperationResult<T> = IDBOperationFailed | IDBOperationSuccess<T>;
 export type PageType = 'k' | 'a';
 export type ChannelInfo =
   | {
-      isChannelExists: true;
+      channelExists: true;
       channelName: string;
       peerId: string;
     }
   | {
-      isChannelExists: false;
+      channelExists: false;
       channelName: null;
       peerId: null;
     };
