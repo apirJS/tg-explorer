@@ -369,7 +369,10 @@ class TelegramScraper {
     }
   }
 
-  private async getChannelInfo(channelName: string): Promise<ChannelInfo> {
+  private async getChannelInfo(
+    channelName: string,
+    back: boolean = true
+  ): Promise<ChannelInfo> {
     try {
       const page = await this.ensureTelegramPage(undefined, true);
 
@@ -415,6 +418,7 @@ class TelegramScraper {
 
           for (const chat of chatList) {
             if (chat.innerHTML.trim() === channelName) {
+              console.log(chat);
               const peerId = chat.getAttribute('data-peer-id');
               if (!peerId) {
                 throw new Error('Cannot retrieve peerId');
@@ -423,8 +427,8 @@ class TelegramScraper {
               return {
                 channelExists: true,
                 channelName: chat.innerHTML.trim(),
+                selector: `[data-peer-id="${peerId}"]`,
                 peerId,
-                spanElement: chat,
               } as const;
             }
           }
@@ -439,10 +443,12 @@ class TelegramScraper {
         channelName
       );
 
-      await page.click(
-        selectors.k.home.SEARCH_INPUT.BACK_TO_HOME_BUTTON.selector,
-        { delay: DEFAULT_CLICK_DELAY_MS }
-      );
+      if (back) {
+        await page.click(
+          selectors.k.home.SEARCH_INPUT.BACK_TO_HOME_BUTTON.selector,
+          { delay: DEFAULT_CLICK_DELAY_MS }
+        );
+      }
 
       return result;
     } catch (error) {
@@ -550,14 +556,16 @@ class TelegramScraper {
       const page = await this.ensureTelegramPage();
       const userId = await this.retrieveUserId();
       const channelName = formatChannelName(userId);
-      const channelInfo = await this.getChannelInfo(channelName);
+      const channelInfo = await this.getChannelInfo(channelName, false);
       if (!channelInfo.channelExists) {
         throw new Error(`Channel "${channelName}" didn't exists`);
       }
 
-      await page.evaluate((span) => {
-        span.dispatchEvent(new MouseEvent("mousedown"))
-      }, channelInfo.spanElement)
+      await page.evaluate((selector) => {
+        document
+          .querySelector(selector)
+          ?.dispatchEvent(new MouseEvent('mousedown'));
+      }, channelInfo.selector);
     } catch (error) {
       throw new Error(
         formatErrorMessage('Failed to navigate to channel', error)

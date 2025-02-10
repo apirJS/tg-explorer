@@ -6,7 +6,7 @@ const selectors = {
           '#column-left > div > div > div.sidebar-header.can-have-forum > div.input-search > input',
         SEARCH_HELPER_LIST: {
           selector:
-            '.search-group.search-group-contacts > .chatlist > a >div.dialog-title > div.user-title > span',
+            '.search-group.search-group-contacts > .chatlist > a > div.dialog-title > div.user-title > span',
         },
         BACK_TO_HOME_BUTTON: {
           selector:
