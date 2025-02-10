@@ -1,4 +1,4 @@
-import { Browser, LaunchOptions, Page } from 'puppeteer';
+import { Browser, LaunchOptions, Mouse, Page } from 'puppeteer';
 import {
   BASE_TELEGRAM_URL,
   DEFAULT_CLICK_DELAY_MS,
@@ -424,6 +424,7 @@ class TelegramScraper {
                 channelExists: true,
                 channelName: chat.innerHTML.trim(),
                 peerId,
+                spanElement: chat,
               } as const;
             }
           }
@@ -554,14 +555,9 @@ class TelegramScraper {
         throw new Error(`Channel "${channelName}" didn't exists`);
       }
 
-      const cachedChannelUrl = await this.getLocalStorageItem('channelUrl');
-      if (cachedChannelUrl) {
-        await page.goto(cachedChannelUrl);
-        return;
-      }
-
-      const channelUrl = formatTelegramChatUrl(channelInfo.peerId);
-      await page.goto(channelUrl);
+      await page.evaluate((span) => {
+        span.dispatchEvent(new MouseEvent("mousedown"))
+      }, channelInfo.spanElement)
     } catch (error) {
       throw new Error(
         formatErrorMessage('Failed to navigate to channel', error)

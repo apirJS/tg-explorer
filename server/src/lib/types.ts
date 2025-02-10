@@ -22,6 +22,7 @@ export type ChannelInfo =
       channelExists: true;
       channelName: string;
       peerId: string;
+      spanElement: HTMLSpanElement;
     }
   | {
       channelExists: false;
