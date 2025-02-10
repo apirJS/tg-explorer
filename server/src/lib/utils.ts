@@ -38,7 +38,7 @@ export function formatFullName(firstName: string, lastName?: string): string {
   return `${firstName} ${lastName}`.trim();
 }
 
-export function getChannelName(userId: string): string {
+export function formatChannelName(userId: string): string {
   return `tg-explorer-${userId}`;
 }
 
@@ -56,7 +56,7 @@ export function formatErrorMessage(
   return `${title}: ${errorMessage}`;
 }
 
-export function generateTelegramChatUrl(
+export function formatTelegramChatUrl(
   peerId: string,
   pageType: PageType = 'k'
 ) {

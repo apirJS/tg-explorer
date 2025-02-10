@@ -6,5 +6,5 @@ EXPERIMENT,TEST,ETC.
 import TelegramScraper from './src/scraper';
 
 const scraper = await TelegramScraper.createInstance();
-await scraper.createChannel();
-// await scraper.navigateToChannel();
+// await scraper.createChannel();
+await scraper.navigateToChannel();
