@@ -34,6 +34,14 @@ const selectors = {
         selector: 'section.bubbles-date-group > div.bubbles-group > div',
         isNodeList: true,
       },
+      FIRST_CHAT_BUBBLE_GROUP: {
+        selector:
+          '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y > div > section > div.bubbles-group.bubbles-group-first',
+      },
+      SCROLLABLE: {
+        selector:
+          '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y',
+      },
     },
   },
 };

@@ -35,7 +35,9 @@ class TelegramScraper {
    * Returns an instance of TelegramScraper.
    * @param options - Launch options for the browser.
    */
-  public static async createInstance(options?: LaunchOptions): Promise<TelegramScraper> {
+  public static async createInstance(
+    options?: LaunchOptions
+  ): Promise<TelegramScraper> {
     if (!TelegramScraper.instance) {
       TelegramScraper.instance = new TelegramScraper();
       await TelegramScraper.instance.initializeBrowser(options);
@@ -93,7 +95,9 @@ class TelegramScraper {
       // Retrieve first page to initialize activePage.
       await this.getFreshPage();
     } catch (error) {
-      throw new Error(formatErrorMessage('Browser initialization failed', error));
+      throw new Error(
+        formatErrorMessage('Browser initialization failed', error)
+      );
     }
   }
 
@@ -114,17 +118,19 @@ class TelegramScraper {
   }
 
   /**
-   * Waits for a loading indicator on the page to disappear.
+   * Waits for the chat-list to loads at least one chat.
    * @param page - The Page to wait on.
    */
-  private async waitForPageLoad(page: Page): Promise<void> {
+  private async waitForChatsLoad(page: Page): Promise<void> {
     try {
       await page.waitForFunction(
         () => document.querySelectorAll('ul.chatlist > a').length > 0,
         { timeout: 30000 }
       );
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to load Telegram page in time', error));
+      throw new Error(
+        formatErrorMessage('Failed to load Telegram page in time', error)
+      );
     }
   }
 
@@ -133,11 +139,16 @@ class TelegramScraper {
    * @param page - The page instance.
    * @param pageType - Page type identifier.
    */
-  private async gotoTelegram(page: Page, pageType: PageType = 'k'): Promise<void> {
+  private async gotoTelegram(
+    page: Page,
+    pageType: PageType = 'k'
+  ): Promise<void> {
     try {
       await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`, { timeout: 30000 });
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to navigate to Telegram page', error));
+      throw new Error(
+        formatErrorMessage('Failed to navigate to Telegram page', error)
+      );
     }
   }
 
@@ -162,11 +173,13 @@ class TelegramScraper {
       ) {
         await this.gotoTelegram(page, pageType);
       }
-      await this.waitForPageLoad(page);
+      await this.waitForChatsLoad(page);
       await this.waitForDOMIdle(page);
       return page;
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to ensure Telegram page', error));
+      throw new Error(
+        formatErrorMessage('Failed to ensure Telegram page', error)
+      );
     }
   }
 
@@ -219,7 +232,8 @@ class TelegramScraper {
               openRequest.onsuccess = null;
               reject(new DOMException('Timeout reached', 'AbortError'));
             });
-            openRequest.onerror = () => reject(new Error('Database open failed'));
+            openRequest.onerror = () =>
+              reject(new Error('Database open failed'));
             openRequest.onsuccess = () => {
               const db = openRequest.result;
               const transaction = db.transaction(storeName, 'readonly');
@@ -242,7 +256,10 @@ class TelegramScraper {
    * @param page - The page instance.
    * @param ms - Minimum wait time (ms) after navigation start.
    */
-  private async waitForNetworkIdle(page: Page, ms: number = 500): Promise<void> {
+  private async waitForNetworkIdle(
+    page: Page,
+    ms: number = 500
+  ): Promise<void> {
     await page.waitForFunction(
       `window.performance.timing.loadEventEnd - window.performance.timing.navigationStart >= ${ms}`
     );
@@ -301,10 +318,15 @@ class TelegramScraper {
   public async checkAuthentication(): Promise<boolean> {
     try {
       await this.ensureTelegramPage();
-      const authState = await this.queryIndexedDB<{ _: string }>('session', 'authState');
+      const authState = await this.queryIndexedDB<{ _: string }>(
+        'session',
+        'authState'
+      );
       return authState?._ === VALID_AUTH_STATE;
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to check for user credentials', error));
+      throw new Error(
+        formatErrorMessage('Failed to check for user credentials', error)
+      );
     }
   }
 
@@ -314,7 +336,9 @@ class TelegramScraper {
   private async retrieveUserId(): Promise<string> {
     try {
       const page = await this.ensureTelegramPage();
-      const userAuthData = await page.evaluate(() => JSON.parse(localStorage.getItem('user_auth') || 'null'));
+      const userAuthData = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('user_auth') || 'null')
+      );
       if (!userAuthData?.id) {
         throw new Error('User ID not found in localStorage');
       }
@@ -328,7 +352,9 @@ class TelegramScraper {
    * Wait for the user to log in.
    * @param timeoutMs - Maximum wait time for login.
    */
-  public async waitForUserLogin(timeoutMs: number = DEFAULT_LOGIN_TIMEOUT_MS): Promise<boolean> {
+  public async waitForUserLogin(
+    timeoutMs: number = DEFAULT_LOGIN_TIMEOUT_MS
+  ): Promise<boolean> {
     try {
       await this.relaunchBrowser({ headless: false });
       await this.ensureTelegramPage();
@@ -349,7 +375,9 @@ class TelegramScraper {
             }
             timeoutId = setTimeout(checkLoop, 1000);
           } catch (error) {
-            reject(new Error(`User login check failed: ${(error as Error).message}`));
+            reject(
+              new Error(`User login check failed: ${(error as Error).message}`)
+            );
           } finally {
             if (timeoutId) {
               clearTimeout(timeoutId);
@@ -370,10 +398,10 @@ class TelegramScraper {
     try {
       await this.ensureTelegramPage();
       const userId = await this.retrieveUserId();
-      const userData = await this.queryIndexedDB<{ first_name: string; last_name?: string }>(
-        'users',
-        userId
-      );
+      const userData = await this.queryIndexedDB<{
+        first_name: string;
+        last_name?: string;
+      }>('users', userId);
       return formatFullName(userData.first_name, userData.last_name);
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to fetch full name', error));
@@ -401,9 +429,14 @@ class TelegramScraper {
   private async getLocalStorageItem(key: string): Promise<string | null> {
     try {
       const page = await this.ensureTelegramPage();
-      return await page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
+      return await page.evaluate(
+        (storageKey) => localStorage.getItem(storageKey),
+        key
+      );
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to retrieve item from localStorage', error));
+      throw new Error(
+        formatErrorMessage('Failed to retrieve item from localStorage', error)
+      );
     }
   }
 
@@ -412,27 +445,33 @@ class TelegramScraper {
    * @param channelName - The name of the channel to search.
    * @param back - Whether to click the back button after search.
    */
-  private async getChannelInfo(channelName: string, back: boolean = true): Promise<ChannelInfo> {
+  private async getChannelInfo(
+    channelName: string,
+    back: boolean = true
+  ): Promise<ChannelInfo> {
     try {
       const page = await this.ensureTelegramPage(undefined, true);
 
       // Focus the search input element to trigger helper list.
-      await page.evaluate(
-        (selectors) => {
-          const focusEvent = new FocusEvent('focus');
-          const inputElement = document.querySelector(selectors.k.home.SEARCH_INPUT.selector) as HTMLInputElement | null;
-          if (!inputElement) {
-            throw new Error('Search input element not found.');
-          }
-          inputElement.dispatchEvent(focusEvent);
-        },
-        selectors
-      );
+      await page.evaluate((selectors) => {
+        const focusEvent = new FocusEvent('focus');
+        const inputElement = document.querySelector(
+          selectors.k.home.SEARCH_INPUT.selector
+        ) as HTMLInputElement | null;
+        if (!inputElement) {
+          throw new Error('Search input element not found.');
+        }
+        inputElement.dispatchEvent(focusEvent);
+      }, selectors);
 
       // Begin channel search.
       await this.waitForDOMIdle(page);
-      await page.type(selectors.k.home.SEARCH_INPUT.selector, channelName, { delay: DEFAULT_TYPING_DELAY_MS });
-      await page.waitForSelector(selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector);
+      await page.type(selectors.k.home.SEARCH_INPUT.selector, channelName, {
+        delay: DEFAULT_TYPING_DELAY_MS,
+      });
+      await page.waitForSelector(
+        selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
+      );
       await this.waitForDOMIdle(page, 3000);
 
       // Query NodeList for channel match.
@@ -442,7 +481,11 @@ class TelegramScraper {
             selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
           );
           if (chatList.length === 0) {
-            return { channelExists: false, channelName: null, peerId: null } as const;
+            return {
+              channelExists: false,
+              channelName: null,
+              peerId: null,
+            } as const;
           }
           for (const chat of chatList) {
             if (chat.innerHTML.trim() === channelName) {
@@ -458,16 +501,23 @@ class TelegramScraper {
               } as const;
             }
           }
-          return { channelExists: false, channelName: null, peerId: null } as const;
+          return {
+            channelExists: false,
+            channelName: null,
+            peerId: null,
+          } as const;
         },
         selectors,
         channelName
       );
 
       if (back) {
-        await page.click(selectors.k.home.SEARCH_INPUT.BACK_TO_HOME_BUTTON.selector, {
-          delay: DEFAULT_CLICK_DELAY_MS,
-        });
+        await page.click(
+          selectors.k.home.SEARCH_INPUT.BACK_TO_HOME_BUTTON.selector,
+          {
+            delay: DEFAULT_CLICK_DELAY_MS,
+          }
+        );
       }
       return result;
     } catch (error) {
@@ -491,32 +541,47 @@ class TelegramScraper {
 
       // Wait for button transition.
       await page.evaluate((selector: string) => {
-        document.querySelector(selector)?.addEventListener('transitionend', () => {
-          return;
-        });
+        document
+          .querySelector(selector)
+          ?.addEventListener('transitionend', () => {
+            return;
+          });
       }, selectors.k.home.PEN_ICON_BUTTON.selector);
 
       // Click pencil button.
       await this.waitForDOMIdle(page);
       await page.waitForSelector(selectors.k.home.PEN_ICON_BUTTON.selector);
-      await page.click(selectors.k.home.PEN_ICON_BUTTON.selector, { delay: DEFAULT_CLICK_DELAY_MS });
+      await page.click(selectors.k.home.PEN_ICON_BUTTON.selector, {
+        delay: DEFAULT_CLICK_DELAY_MS,
+      });
 
       // Click on "New Channel" menu item.
       await this.waitForDOMIdle(page);
-      await page.waitForSelector(selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector);
-      await page.click(selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector, { delay: DEFAULT_CLICK_DELAY_MS });
+      await page.waitForSelector(
+        selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector
+      );
+      await page.click(
+        selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.selector,
+        { delay: DEFAULT_CLICK_DELAY_MS }
+      );
 
       // Set channel name and allow navigation.
       const channelUrl: string = await page.evaluate(
         (selectors, channelName) => {
-          const div = document.querySelector<HTMLDivElement>(selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.CHANNEL_NAME_INPUT.selector);
+          const div = document.querySelector<HTMLDivElement>(
+            selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON
+              .CHANNEL_NAME_INPUT.selector
+          );
           if (!div) {
             throw new Error('Channel name input element missing');
           }
           div.innerHTML = channelName;
           div.classList.remove('is-empty');
 
-          const button = document.querySelector<HTMLButtonElement>(selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.ARROW_BUTTON.selector);
+          const button = document.querySelector<HTMLButtonElement>(
+            selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.ARROW_BUTTON
+              .selector
+          );
           if (!button) {
             throw new Error('Arrow button (continue button) is missing');
           }
@@ -529,9 +594,13 @@ class TelegramScraper {
 
       // Click arrow button to continue.
       await this.waitForDOMIdle(page);
-      await page.click(selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.ARROW_BUTTON.selector, {
-        delay: DEFAULT_CLICK_DELAY_MS,
-      });
+      await page.click(
+        selectors.k.home.PEN_ICON_BUTTON.NEW_CHANNEL_BUTTON.ARROW_BUTTON
+          .selector,
+        {
+          delay: DEFAULT_CLICK_DELAY_MS,
+        }
+      );
 
       const creationSuccess = await this.isChannelExists(channelName);
       if (!creationSuccess) {
@@ -558,16 +627,20 @@ class TelegramScraper {
       }
 
       await page.evaluate((selector: string) => {
-        document.querySelector(selector)?.dispatchEvent(new MouseEvent('mousedown'));
+        document
+          .querySelector(selector)
+          ?.dispatchEvent(new MouseEvent('mousedown'));
       }, channelInfo.selector);
     } catch (error) {
-      throw new Error(formatErrorMessage('Failed to navigate to channel', error));
+      throw new Error(
+        formatErrorMessage('Failed to navigate to channel', error)
+      );
     }
   }
 
   /**
    * Checks if a channel exists in IndexedDB.
-   * @param peerId - The peer ID of the channel. Starts with "-"; ex: -213871827.
+   * @param peerId - The peer ID of the channel. Starts with "-" for example: -213871827.
    */
   private async isChannelExists(peerId: string): Promise<boolean> {
     try {
@@ -578,6 +651,62 @@ class TelegramScraper {
         return false;
       }
       throw new Error(formatErrorMessage('Failed to check for channel', error));
+    }
+  }
+
+  /**
+   * Scroll until the "Channel Created" message is detected
+   * @param {number} timeoutMs - The timeout in milliseconds
+   * @param {number} intervalMs - interval between scroll in ms
+   */
+  private async scrollMessagePanel(
+    timeoutMs: number = 1000 * 60 * 10,
+    intervalMs: number = 100
+  ): Promise<void> {
+    try {
+      const page = await this.ensureTelegramPage(undefined, true);
+      await page.evaluate(
+        (selectors, timeoutMs, intervalMs) => {
+          return new Promise<void>((resolve, reject) => {
+            const scrollable = document.querySelector<HTMLDivElement>(
+              selectors.k.channel.SCROLLABLE.selector
+            );
+            if (!scrollable) {
+              return reject(new Error('Scrollable element not found'));
+            }
+
+            const timeoutId = setTimeout(() => {
+              clearInterval(intervalId);
+              reject(new Error('Timeout reached'));
+            }, timeoutMs);
+
+            const intervalId = setInterval(() => {
+              // Trigger scrolling to load older messages.
+              scrollable.scrollTo(0, -document.body.scrollHeight);
+              scrollable.scrollTo(0, 200);
+              scrollable.scrollTo(0, 100);
+              scrollable.scrollTo(0, 200);
+
+              // Check if "Channel Created" message appears.
+              const elem = document.querySelector(
+                selectors.k.channel.FIRST_CHAT_BUBBLE_GROUP.selector
+              );
+              if (elem !== null) {
+                clearTimeout(timeoutId);
+                clearInterval(intervalId);
+                resolve();
+              }
+            }, intervalMs);
+          });
+        },
+        selectors,
+        timeoutMs,
+        intervalMs
+      );
+    } catch (error) {
+      throw new Error(
+        formatErrorMessage('Failed to scroll message panel', error)
+      );
     }
   }
 }
