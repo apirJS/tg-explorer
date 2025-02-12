@@ -660,7 +660,7 @@ class TelegramScraper {
    * @param {number} intervalMs - interval between scroll in ms
    */
   private async scrollMessagePanel(
-    timeoutMs: number = 1000 * 60 * 10,
+    timeoutMs: number = 1000 * 60 * 5,
     intervalMs: number = 100
   ): Promise<void> {
     try {
