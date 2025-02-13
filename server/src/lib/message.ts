@@ -8,7 +8,7 @@ type ConstructorParams = {
 };
 
 class Message {
-  private messageContent: string;
+  private folder: string;
   private file: BunFile;
   private fileName: string;
   private fileType: string;
@@ -19,8 +19,15 @@ class Message {
   private modifiedAt: Date;
   private isAPart: boolean;
   private nthPart: number;
+  private messageId: string;
+  private messageElement: HTMLDivElement;
 
-  constructor({ file, filePath, isAPart = false, nthPart = -1 }: ConstructorParams) {
+  constructor({
+    file,
+    filePath,
+    isAPart = false,
+    nthPart = -1,
+  }: ConstructorParams) {
     this.file = file;
     this.filePath = filePath;
     this.fileName = this.extractFileName(filePath);

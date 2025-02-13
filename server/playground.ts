@@ -1,10 +1,12 @@
+import path from 'path';
+import crypto from 'crypto';
 /* 
 A PLACE FOR PLAYING AROUND WITH CODE; 
 EXPERIMENT,TEST,ETC.
 */
 
-import TelegramScraper from './src/scraper';
+const str = "this_is_some_random_folder_nam";
+const hash = crypto.createHash('sha256').update(str).digest('hex');
 
-const scraper = await TelegramScraper.createInstance();
-await scraper.createChannel();
-// await scraper.navigateToChannel();
+console.log(`Hash for "${str}": ${hash}`);
+
