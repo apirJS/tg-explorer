@@ -6,19 +6,19 @@ import {
   DEFAULT_LOGIN_TIMEOUT_MS,
   DEFAULT_TYPING_DELAY_MS,
   VALID_AUTH_STATE,
-} from './lib/const';
+} from '../lib/const';
 import path from 'path';
 import {
   formatChannelName,
   formatFullName,
   formatErrorMessage,
   formatTelegramChatUrl,
-} from './lib/utils';
-import { ChannelInfo, PageType } from './lib/types';
+} from '../lib/utils';
+import { ChannelInfo, PageType } from '../lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { INDEXED_DB_CONFIG } from './lib/config';
-import selectors from './lib/selectors';
+import { INDEXED_DB_CONFIG } from '../lib/config';
+import selectors from '../lib/selectors';
 
 /**
  * TelegramScraper is a singleton class that manages the browser instance
