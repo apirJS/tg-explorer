@@ -1,9 +1,7 @@
-import { LaunchOptions, Page } from 'puppeteer';
-import path from 'path';
-import fs from 'fs';
-import Scraper from '../scraper';
-import { IDBOperationResult, IDBOperationSuccess, PageType } from './types';
+import { Page } from 'puppeteer';
+import { PageType } from './types';
 import { BASE_TELEGRAM_URL } from './const';
+import type { EnvirontmentVariables } from './global.types';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -21,17 +19,6 @@ export function disableAnimation(page: Page) {
 
     page.addStyleTag({ content });
   });
-}
-
-export function isSessionFolderExists(): boolean {
-  const folder = path.resolve(__dirname, '../../session');
-  return fs.existsSync(folder);
-}
-
-export function isIDBOperationSuccess<T = any>(
-  result: IDBOperationResult<T>
-): result is IDBOperationSuccess<T> {
-  return (result as IDBOperationSuccess<T>).data !== undefined;
 }
 
 export function formatFullName(firstName: string, lastName?: string): string {
@@ -61,4 +48,11 @@ export function formatTelegramChatUrl(
   pageType: PageType = 'k'
 ) {
   return `${BASE_TELEGRAM_URL}/${pageType}/#${peerId}`;
+}
+export function getEnv(key: keyof EnvirontmentVariables): string {
+  try {
+    return Bun.env[key];
+  } catch (error) {
+    throw new Error(`Environment variable [${key}] was missing.`);
+  }
 }
