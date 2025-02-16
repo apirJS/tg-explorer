@@ -8,13 +8,16 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.2.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.39.3",
     "elysia": "latest",
     "puppeteer": "^24.0.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "drizzle-kit": "^0.30.4"
   },
   "module": "src/index.js"
 }
