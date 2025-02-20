@@ -20,11 +20,12 @@ const selectors = {
             '#new-menu > div.btn-menu.top-left.active.was-open > div:nth-child(1)',
           CHANNEL_NAME_INPUT: {
             selector:
-              '#column-left > div > div.tabs-tab.sidebar-slider-item.scrolled-top.scrolled-bottom.scrollable-y-bordered.new-channel-container.active > div.sidebar-content > div > div.sidebar-left-section-container > div.sidebar-left-section > div > div.input-wrapper > div:nth-child(1) > div.input-field-input',
+              "div.input-field-input[contenteditable='true'][data-no-linebreaks='1']",
           },
           ARROW_BUTTON: {
             selector:
-              '#column-left > div > div.tabs-tab.sidebar-slider-item.scrolled-top.scrolled-bottom.scrollable-y-bordered.new-channel-container.active > div.sidebar-content > button',
+              '.new-channel-container > .sidebar-content > button.btn-circle.btn-corner.z-depth-1.rp:has(div.c-ripple,span)',
+              
           },
         },
       },

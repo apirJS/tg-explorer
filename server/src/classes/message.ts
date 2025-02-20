@@ -92,3 +92,5 @@ class Message {
     return this.messageElement.outerHTML;
   }
 }
+
+export default Message;

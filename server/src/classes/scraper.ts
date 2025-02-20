@@ -469,9 +469,6 @@ class TelegramScraper {
       await page.type(selectors.k.home.SEARCH_INPUT.selector, channelName, {
         delay: DEFAULT_TYPING_DELAY_MS,
       });
-      await page.waitForSelector(
-        selectors.k.home.SEARCH_INPUT.SEARCH_HELPER_LIST.selector
-      );
       await this.waitForDOMIdle(page, 3000);
 
       // Query NodeList for channel match.
@@ -519,6 +516,8 @@ class TelegramScraper {
           }
         );
       }
+
+      console.log('channel checked');
       return result;
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to get channel info', error));
@@ -533,7 +532,7 @@ class TelegramScraper {
       const page = await this.ensureTelegramPage(undefined, true);
       const userId = await this.retrieveUserId();
       const channelName = formatChannelName(userId);
-      const channelInfo = await this.getChannelInfo(channelName);
+      const channelInfo = await this.getChannelInfo(channelName, true);
 
       if (channelInfo.channelExists) {
         throw new Error('Channel already exists.');
@@ -708,6 +707,19 @@ class TelegramScraper {
         formatErrorMessage('Failed to scroll message panel', error)
       );
     }
+  }
+
+  /*
+   *
+   *
+   * DUMMIES FUNCTIONS FOR TESTING PURPOSE HERE
+   *
+   *
+   */
+
+  async upload() {
+    const page = await this.ensureTelegramPage('k', true, undefined);
+    await this.navigateToChannel();
   }
 }
 
