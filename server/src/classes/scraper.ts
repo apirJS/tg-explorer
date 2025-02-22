@@ -31,12 +31,24 @@ class TelegramScraper {
 
   private constructor() {}
 
+  /**
+   *
+   * @param message - Message that is being logged
+   */
   private log(message: string): void {
     console.log(`[${new Date().toISOString()}] -- ${message}`);
   }
 
+  /**
+   *
+   * @param message - Error message that is being logged
+   * @param error - Error object
+   */
   private errorLog(message: string, error: any): void {
-    console.error(`[${new Date().toISOString()}] -- ${message}!`, error);
+    console.error(
+      `[${new Date().toISOString()}] -- [ERROR] -- ${message}!`,
+      error
+    );
   }
 
   /**

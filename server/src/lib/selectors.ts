@@ -3,14 +3,14 @@ const selectors = {
     home: {
       SEARCH_INPUT: {
         selector:
-          '#column-left > div > div > div.sidebar-header.can-have-forum > div.input-search > input',
+          ".input-search input[type='text']",
         SEARCH_HELPER_LIST: {
           selector:
             '.search-group.search-group-contacts > .chatlist > a > div.dialog-title > div.user-title > span',
         },
         BACK_TO_HOME_BUTTON: {
           selector:
-            '#column-left > div > div > div.sidebar-header.can-have-forum > div.sidebar-header__btn-container > div.btn-icon.sidebar-back-button',
+            'div.sidebar-header__btn-container > div.btn-icon.sidebar-back-button',
         },
       },
       PEN_ICON_BUTTON: {
