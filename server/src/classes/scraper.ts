@@ -13,6 +13,7 @@ import {
   formatFullName,
   formatErrorMessage,
   formatTelegramChatUrl,
+  log,
 } from '../lib/utils';
 import { ChannelInfo, PageType } from '../lib/types';
 import puppeteer from 'puppeteer-extra';
@@ -32,41 +33,30 @@ class TelegramScraper {
   private constructor() {}
 
   /**
-   *
-   * @param message - Message that is being logged
-   */
-  private log(message: string): void {
-    console.log(`[${new Date().toISOString()}] -- ${message}`);
-  }
-
-  /**
-   *
-   * @param message - Error message that is being logged
-   * @param error - Error object
-   */
-  private errorLog(message: string, error: any): void {
-    console.error(
-      `[${new Date().toISOString()}] -- [ERROR] -- ${message}!`,
-      error
-    );
-  }
-
-  /**
    * Returns an instance of TelegramScraper.
    * @param options - Launch options for the browser.
    */
   public static async createInstance(
     options?: LaunchOptions
   ): Promise<TelegramScraper> {
-    console.log(
-      `[${new Date().toISOString()}] -- Creating scraper instance...`
-    );
-    if (!TelegramScraper.instance) {
-      TelegramScraper.instance = new TelegramScraper();
-      await TelegramScraper.instance.initializeBrowser(options);
+    try {
+      log(`Creating scraper instance...`);
+
+      if (!TelegramScraper.instance) {
+        TelegramScraper.instance = new TelegramScraper();
+        await TelegramScraper.instance.initializeBrowser(options);
+      }
+
+      log(`Scraper instance created.`, { success: true });
+
+      return TelegramScraper.instance;
+    } catch (error) {
+      log(`Failed to create scraper instance`, { type: 'error', error });
+
+      throw new Error(
+        formatErrorMessage('Failed to create scraper instance!', error)
+      );
     }
-    console.log(`[${new Date().toISOString()}] -- Scraper instance created.`);
-    return TelegramScraper.instance;
   }
 
   /** Getter for the browser instance. */
@@ -111,7 +101,7 @@ class TelegramScraper {
    */
   private async initializeBrowser(options?: LaunchOptions): Promise<void> {
     try {
-      this.log('Initializing browser...');
+      log('Initializing browser...');
       puppeteer.use(stealthPlugin());
       this._browser = await puppeteer.launch({
         ...this.defaultBrowserSettings,
@@ -119,9 +109,9 @@ class TelegramScraper {
       });
       // Retrieve first page to initialize activePage.
       await this.getFreshPage();
-      this.log('Browser initialization success.');
+      log('Browser initialization success.', { success: true });
     } catch (error) {
-      this.errorLog('Failed to open a browser instance', error);
+      log('Failed to open a browser instance', { type: 'error', error });
       throw new Error(
         formatErrorMessage('Browser initialization failed', error)
       );
@@ -133,17 +123,21 @@ class TelegramScraper {
    */
   private async getFreshPage(): Promise<Page> {
     try {
-      this.log('Getting fresh page...');
+      log('Getting fresh page...', { indentSize: 1 });
+
       if (this._activePage && !this._activePage.isClosed()) {
-        this.log('Fresh page obtained.');
+        log('Fresh page obtained.', { indentSize: 1, success: true });
         return this._activePage;
       }
+
       const pages = await this._browser.pages();
       this._activePage = pages[0] || (await this._browser.newPage());
-      this.log('Fresh page obtained.');
+
+      log('Fresh page obtained.', { indentSize: 1, success: true });
+
       return this._activePage;
     } catch (error) {
-      this.errorLog('Failed to retrieve fresh page', error);
+      log('Failed to retrieve fresh page', { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to obtain fresh page', error));
     }
   }
@@ -154,14 +148,16 @@ class TelegramScraper {
    */
   private async waitForChatsLoad(page: Page): Promise<void> {
     try {
-      this.log('Waiting for chat list element...');
+      log('Waiting for chat list element...', { indentSize: 1 });
+
       await page.waitForFunction(
         () => document.querySelectorAll('ul.chatlist > a').length > 0,
         { timeout: 30000 }
       );
-      this.log('Waiting success.');
+
+      log('Waiting success.', { success: true, indentSize: 1 });
     } catch (error) {
-      this.errorLog('Failed to wait for chat list element', error);
+      log('Failed to wait for chat list element', { type: 'error', error });
       throw new Error(
         formatErrorMessage('Failed to load Telegram page in time', error)
       );
@@ -178,11 +174,13 @@ class TelegramScraper {
     pageType: PageType = 'k'
   ): Promise<void> {
     try {
-      this.log('Opening telegram...');
+      log('Opening telegram...');
+
       await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`, { timeout: 30000 });
-      this.log('Telegram opened.');
+
+      log('Telegram opened.', { success: true });
     } catch (error) {
-      this.errorLog('Failed to visit telegram', error);
+      log('Failed to visit telegram', { type: 'error', error });
       throw new Error(
         formatErrorMessage('Failed to navigate to Telegram page', error)
       );
@@ -201,6 +199,8 @@ class TelegramScraper {
     reload: boolean = false
   ): Promise<Page> {
     try {
+      log('Ensuring Telegram page...', { indentSize: 1 });
+
       const page = await this.getFreshPage();
       const url = new URL(page.url());
       if (
@@ -212,6 +212,9 @@ class TelegramScraper {
       }
       await this.waitForChatsLoad(page);
       await this.waitForDOMIdle(page);
+
+      log('Already in a Telegram page', { success: true, indentSize: 1 });
+
       return page;
     } catch (error) {
       throw new Error(
@@ -225,11 +228,13 @@ class TelegramScraper {
    */
   public async closeInstance(): Promise<void> {
     try {
-      this.log('Closing scraper instance...');
+      log('Closing scraper instance...');
+
       await this._browser.close();
-      this.log('Scraper instance closed.');
+
+      log('Scraper instance closed.', { success: true });
     } catch (error) {
-      this.errorLog('Failed to close the instance', error);
+      log('Failed to close the instance', { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to close browser', error));
     }
   }
@@ -240,14 +245,17 @@ class TelegramScraper {
    */
   private async relaunchBrowser(options: LaunchOptions): Promise<void> {
     try {
-      this.log('Relaunching browser...');
+      log('Relaunching browser...');
+
       if (this._browser) {
         await this._browser.close();
       }
       await this.initializeBrowser(options);
-      this.log('Browser relaunced');
+
+      log('Browser relaunced', { success: true });
     } catch (error) {
-      this.errorLog('Failed to relaunch browser', error);
+      log('Failed to relaunch browser', { type: 'error', error });
+
       throw new Error(formatErrorMessage('Failed to relaunch browser', error));
     }
   }
@@ -265,24 +273,35 @@ class TelegramScraper {
   ): Promise<T> {
     const page = await this.ensureTelegramPage();
     try {
+      log(`Querying [${storeName}.${key}] on IDB...`);
+
       return await page.evaluate(
         async ({ storeName, key, timeoutMs, INDEXED_DB_CONFIG }) => {
           const abortTimeout = AbortSignal.timeout(timeoutMs);
           return new Promise<T>((resolve, reject) => {
             const openRequest = indexedDB.open(INDEXED_DB_CONFIG.DATABASE_NAME);
+
             abortTimeout.addEventListener('abort', () => {
               openRequest.onerror = null;
               openRequest.onsuccess = null;
               reject(new DOMException('Timeout reached', 'AbortError'));
             });
+
             openRequest.onerror = () =>
               reject(new Error('Database open failed'));
+
             openRequest.onsuccess = () => {
               const db = openRequest.result;
               const transaction = db.transaction(storeName, 'readonly');
               const store = transaction.objectStore(storeName);
               const query = store.get(key);
-              query.onsuccess = () => resolve(query.result);
+              query.onsuccess = () => {
+                log(`Query for [${storeName}.${key}] success.`, {
+                  success: true,
+                });
+
+                resolve(query.result);
+              };
               query.onerror = () => reject(new Error('Data query failed'));
             };
           });
@@ -303,11 +322,13 @@ class TelegramScraper {
     page: Page,
     ms: number = 500
   ): Promise<void> {
-    this.log('Waiting for network idle...');
+    log('Waiting for network idle...', { indentSize: 1 });
+
     await page.waitForFunction(
       `window.performance.timing.loadEventEnd - window.performance.timing.navigationStart >= ${ms}`
     );
-    this.log('Waiting success');
+
+    log('Network is idle', { success: true, indentSize: 1 });
   }
 
   /**
@@ -324,7 +345,8 @@ class TelegramScraper {
     ms: number = 500,
     timeoutMs: number = 5000
   ): Promise<void> {
-    this.log('Waiting for DOM idle...');
+    log('Waiting for DOM idle...', { indentSize: 1 });
+
     await page.waitForFunction(
       (ms: number, timeoutMs: number) => {
         return new Promise((resolve) => {
@@ -356,7 +378,8 @@ class TelegramScraper {
       ms,
       timeoutMs
     );
-    this.log('DOM is idle.');
+
+    log('DOM is idle.', { success: true, indentSize: 1 });
   }
 
   /**
@@ -364,16 +387,18 @@ class TelegramScraper {
    */
   public async checkAuthentication(): Promise<boolean> {
     try {
-      this.log("Checking for user's authentication...");
+      log("Checking for user's authentication...");
+
       await this.ensureTelegramPage();
       const authState = await this.queryIndexedDB<{ _: string }>(
         'session',
         'authState'
       );
-      this.log('Credentials verified.');
+
+      log('Credentials is valid.', { success: true });
       return authState?._ === VALID_AUTH_STATE;
     } catch (error) {
-      this.errorLog('Failed to check for credentials', error);
+      log('Failed to check for credentials', { type: 'error', error });
       throw new Error(
         formatErrorMessage('Failed to check for user credentials', error)
       );
@@ -385,7 +410,8 @@ class TelegramScraper {
    */
   private async retrieveUserId(): Promise<string> {
     try {
-      this.log('Retrieving userid...');
+      log('Retrieving userid...', { indentSize: 1 });
+
       const page = await this.ensureTelegramPage();
       const userAuthData = await page.evaluate(() =>
         JSON.parse(localStorage.getItem('user_auth') || 'null')
@@ -393,10 +419,12 @@ class TelegramScraper {
       if (!userAuthData?.id) {
         throw new Error('User ID not found in localStorage');
       }
-      this.log('Userid retreived');
+
+      log('Userid retreived', { success: true, indentSize: 1 });
+
       return userAuthData.id;
     } catch (error) {
-      this.errorLog('Failed to retrieve userid', error);
+      log('Failed to retrieve userid', { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to retrieve user ID', error));
     }
   }
@@ -409,7 +437,8 @@ class TelegramScraper {
     timeoutMs: number = DEFAULT_LOGIN_TIMEOUT_MS
   ): Promise<boolean> {
     try {
-      this.log('Waiting for user to login...');
+      log('Waiting for user to login...');
+
       await this.relaunchBrowser({ headless: false });
       await this.ensureTelegramPage();
       return await new Promise((resolve, reject) => {
@@ -420,19 +449,17 @@ class TelegramScraper {
           try {
             const userId = await this.retrieveUserId();
             if (userId) {
-              this.log('Login success.');
+              log('Login success.', { success: true });
+
               resolve(true);
               return;
             }
             if (Date.now() - startTime > timeoutMs) {
-              const err = new Error('Login failed. Timeout reached.');
-              this.errorLog('Login failed. Timeout reached.', err);
-              reject(err);
+              reject(new Error('Login failed. Timeout reached.'));
               return;
             }
             timeoutId = setTimeout(checkLoop, 1000);
           } catch (error) {
-            this.errorLog('Login failed', error);
             reject(
               new Error(`User login check failed: ${(error as Error).message}`)
             );
@@ -445,7 +472,8 @@ class TelegramScraper {
         checkLoop();
       });
     } catch (error) {
-      this.errorLog('Login failed. Timeout reached.', error);
+      log('Login failed. Timeout reached.', { type: 'error', error });
+
       throw new Error(formatErrorMessage('User failed to login', error));
     }
   }
@@ -455,17 +483,19 @@ class TelegramScraper {
    */
   public async fetchUserFullName(): Promise<string> {
     try {
-      this.log("Fetching user's fullname...");
+      log("Fetching user's fullname...", { indentSize: 1 });
+
       await this.ensureTelegramPage();
       const userId = await this.retrieveUserId();
       const userData = await this.queryIndexedDB<{
         first_name: string;
         last_name?: string;
       }>('users', userId);
-      this.log('Username fetched.');
+
+      log('Username fetched.', { success: true, indentSize: 1 });
       return formatFullName(userData.first_name, userData.last_name);
     } catch (error) {
-      this.errorLog("Failed to fetch user's fullname", error);
+      log("Failed to fetch user's fullname", { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to fetch full name', error));
     }
   }
@@ -477,12 +507,14 @@ class TelegramScraper {
    */
   private async updateLocalStorage(key: string, value: string): Promise<void> {
     try {
-      this.log('Updating local storage...');
+      log('Updating local storage...', { indentSize: 1 });
+
       const page = await this.ensureTelegramPage();
       await page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, value]);
-      this.log('Localstorage updated.');
+
+      log('Localstorage updated.', { success: true, indentSize: 1 });
     } catch (error) {
-      this.log('Failed to update localstorage');
+      log('Failed to update localstorage', { type: 'error', error });
       throw new Error(formatErrorMessage('LocalStorage update failed', error));
     }
   }
@@ -493,11 +525,20 @@ class TelegramScraper {
    */
   private async getLocalStorageItem(key: string): Promise<string | null> {
     try {
+      log('Getting local storage item...', { indentSize: 1 });
+
       const page = await this.ensureTelegramPage();
-      return await page.evaluate(
+      const result = await page.evaluate(
         (storageKey) => localStorage.getItem(storageKey),
         key
       );
+
+      log(`Local storage item [${key}] retrieved.`, {
+        success: true,
+        indentSize: 1,
+      });
+
+      return result;
     } catch (error) {
       throw new Error(
         formatErrorMessage('Failed to retrieve item from localStorage', error)
@@ -515,7 +556,8 @@ class TelegramScraper {
     back: boolean = true
   ): Promise<ChannelInfo> {
     try {
-      this.log('Getting channel info...');
+      log('Getting channel info...', { indentSize: 1 });
+
       const page = await this.ensureTelegramPage(undefined, true);
 
       // Focus the search input element to trigger helper list.
@@ -583,10 +625,14 @@ class TelegramScraper {
         );
       }
 
-      this.log('Channel info fetched successfully.');
+      log('Channel info fetched successfully.', {
+        success: true,
+        indentSize: 1,
+      });
+
       return result;
     } catch (error) {
-      this.errorLog('Failed to fetch channel info', error);
+      log('Failed to fetch channel info', { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to get channel info', error));
     }
   }
@@ -596,14 +642,18 @@ class TelegramScraper {
    */
   public async createChannel(): Promise<boolean> {
     try {
-      this.log('Creating telegram channel...');
+      log('Creating telegram channel...');
+
       const page = await this.ensureTelegramPage(undefined, true);
       const userId = await this.retrieveUserId();
       const channelName = formatChannelName(userId);
       const channelInfo = await this.getChannelInfo(channelName, true);
 
       if (channelInfo.channelExists) {
-        this.log('Failed, channel already exists!');
+        log('Failed, channel already exists!', {
+          success: false,
+        });
+
         return false;
       }
 
@@ -672,14 +722,14 @@ class TelegramScraper {
 
       const creationSuccess = await this.isChannelExists(channelName);
       if (!creationSuccess) {
-        this.log('Failed to create channel');
+        log('Failed to create channel', { type: 'warn' });
         return false;
       }
       await this.updateLocalStorage('channelUrl', channelUrl);
-      this.log('Telegram channel created successfully.');
+      log('Telegram channel created successfully.', { success: true });
       return true;
     } catch (error) {
-      this.errorLog('Failed to create telegram channel', error);
+      log('Failed to create telegram channel', { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to create channel', error));
     }
   }
@@ -689,10 +739,11 @@ class TelegramScraper {
    */
   public async navigateToChannel(): Promise<void> {
     try {
+      log(`Navigating to telegram channel...`);
+
       const page = await this.ensureTelegramPage();
       const userId = await this.retrieveUserId();
       const channelName = formatChannelName(userId);
-      this.log(`Navigating to telegram channel [${channelName}]...`);
       const channelInfo = await this.getChannelInfo(channelName, false);
       if (!channelInfo.channelExists) {
         throw new Error(`Channel "${channelName}" doesn't exist`);
@@ -703,9 +754,10 @@ class TelegramScraper {
           .querySelector(selector)
           ?.dispatchEvent(new MouseEvent('mousedown'));
       }, channelInfo.selector);
-      this.log('Navigation success.');
+
+      log('Navigation success.', { success: true });
     } catch (error) {
-      this.errorLog('Failed to navigate to telegram channel', error);
+      log('Failed to navigate to telegram channel', { type: 'error', error });
       throw new Error(
         formatErrorMessage('Failed to navigate to channel', error)
       );
@@ -718,13 +770,19 @@ class TelegramScraper {
    */
   private async isChannelExists(peerId: string): Promise<boolean> {
     try {
-      this.log('Checking for channel existsance...');
+      log('Checking for channel existsance...', { indentSize: 1 });
+
       await this.queryIndexedDB('dialogs', peerId);
-      this.log('Channel exists.');
+
+      log('Channel exists.', { indentSize: 1, success: true });
       return true;
     } catch (error) {
-      this.errorLog('Failed to check for for channel existsance', error);
+      log('Failed to check for for channel existsance', {
+        type: 'error',
+        error,
+      });
       if (error instanceof Error && error.message === 'Data query failed') {
+        log('Channel was not exists.', { indentSize: 1, success: false });
         return false;
       }
       throw new Error(formatErrorMessage('Failed to check for channel', error));
@@ -741,7 +799,8 @@ class TelegramScraper {
     intervalMs: number = 100
   ): Promise<void> {
     try {
-      this.log('Scrolling message panel to top...');
+      log('Scrolling message panel to top...');
+
       const page = await this.ensureTelegramPage(undefined, true);
       await page.evaluate(
         (selectors, timeoutMs, intervalMs) => {
@@ -781,9 +840,13 @@ class TelegramScraper {
         timeoutMs,
         intervalMs
       );
-      this.log('Top of the message panel reached.');
+
+      log('Top of the message panel reached.', { success: true });
     } catch (error) {
-      this.errorLog('Failed to scroll to top of the message panel', error);
+      log('Failed to scroll to top of the message panel', {
+        type: 'error',
+        error,
+      });
       throw new Error(
         formatErrorMessage('Failed to scroll message panel', error)
       );

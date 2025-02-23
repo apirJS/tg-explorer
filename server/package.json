@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@elysiajs/cors": "^1.2.0",
+    "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.39.3",
     "elysia": "latest",

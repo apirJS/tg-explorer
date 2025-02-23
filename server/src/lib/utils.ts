@@ -1,7 +1,8 @@
 import { Page } from 'puppeteer';
-import { PageType } from './types';
+import { LogOptions, PageType } from './types';
 import { BASE_TELEGRAM_URL } from './const';
 import type { EnvirontmentVariables } from './global.types';
+import chalk, { ForegroundColorName } from 'chalk';
 
 export function disableAnimation(page: Page) {
   page.on('load', () => {
@@ -54,5 +55,38 @@ export function getEnv(key: keyof EnvirontmentVariables): string {
     return Bun.env[key];
   } catch (error) {
     throw new Error(`Environment variable [${key}] was missing.`);
+  }
+}
+
+/**
+ *
+ * @param message - Message that is being logged
+ */
+export function log(message: string, options: LogOptions = {}): void {
+  const { type = 'log', indentSize = 0, color, success, error } = options;
+  const indent = indentSize >= 1 ? '└──' + '──'.repeat(indentSize) : '';
+  const timestamp = new Date().toISOString();
+  const prefix = `${indent}${timestamp} ── `;
+
+  switch (type) {
+    case 'warn': {
+      console.warn(indent + chalk.yellow(message));
+      break;
+    }
+    case 'error': {
+      console.error(indent + message, '\n', error);
+      break;
+    }
+    case 'info': {
+      console.log(indent + message);
+    }
+    default: {
+      const defaultColor =
+        success !== undefined ? (success ? 'green' : 'yellow') : color || 'white';
+      const coloredMessage = chalk[defaultColor](message);
+
+      console.log(`${prefix}${coloredMessage}`);
+      break;
+    }
   }
 }

@@ -1,3 +1,5 @@
+import { ForegroundColorName } from 'chalk';
+
 export type WSMessageData<T> = T extends WSMessage<infer U> ? U : never;
 
 export type WSMessageTypes =
@@ -29,3 +31,11 @@ export type ChannelInfo =
       channelName: null;
       peerId: null;
     };
+
+export interface LogOptions {
+  error?: any;
+  type?: 'error' | 'log' | 'info' | 'warn';
+  indentSize?: number;
+  success?: boolean;
+  color?: ForegroundColorName
+}

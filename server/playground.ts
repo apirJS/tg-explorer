@@ -7,5 +7,6 @@ EXPERIMENT,TEST,ETC.
 */
 
 const scraper = await TelegramScraper.createInstance({ headless: false });
+console.log()
 await scraper.createChannel()
 await scraper.navigateToChannel()
