@@ -43,6 +43,9 @@ const selectors = {
         selector:
           '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y',
       },
+      UPLOAD_MENU_ICON: {
+        selector: ""
+      }
     },
   },
 };
