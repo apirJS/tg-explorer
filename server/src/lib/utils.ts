@@ -63,10 +63,13 @@ export function getEnv(key: keyof EnvirontmentVariables): string {
  * @param message - Message that is being logged
  */
 export function log(message: string, options: LogOptions = {}): void {
-  const { type = 'log', indentSize = 0, color, success, error } = options;
+  let { type = 'log', indentSize = 0, color, success, error } = options;
   const indent = indentSize >= 1 ? '└──' + '──'.repeat(indentSize) : '';
   const timestamp = new Date().toISOString();
-  const prefix = `${indent}${timestamp} ── `;
+  color = indentSize === 0 ? 'blue' : color || 'white';
+  const prefix = chalk[color](
+    `${indent}${timestamp} ── `
+  );
 
   switch (type) {
     case 'warn': {
@@ -82,7 +85,7 @@ export function log(message: string, options: LogOptions = {}): void {
     }
     default: {
       const defaultColor =
-        success !== undefined ? (success ? 'green' : 'yellow') : color || 'white';
+        success !== undefined ? (success ? 'green' : 'red') : color || 'white';
       const coloredMessage = chalk[defaultColor](message);
 
       console.log(`${prefix}${coloredMessage}`);

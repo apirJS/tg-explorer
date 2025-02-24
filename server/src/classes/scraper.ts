@@ -18,7 +18,6 @@ import {
 import { ChannelInfo, PageType } from '../lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { INDEXED_DB_CONFIG } from '../lib/config';
 import selectors from '../lib/selectors';
 
 /**
@@ -29,6 +28,7 @@ class TelegramScraper {
   private static instance: TelegramScraper;
   private _browser!: Browser;
   private _activePage?: Page;
+  private _currentDatabase?: string;
 
   private constructor() {}
 
@@ -91,7 +91,7 @@ class TelegramScraper {
       defaultViewport: { width: 1280, height: 720 },
       headless: false,
       userDataDir: path.resolve(__dirname, '../session'),
-      args: ['--start-maximized'],
+      args: ['--start-maximized', '--lang=en-US'],
     };
   }
 
@@ -174,11 +174,11 @@ class TelegramScraper {
     pageType: PageType = 'k'
   ): Promise<void> {
     try {
-      log('Opening telegram...');
+      log('Opening telegram...', { indentSize: 1 });
 
       await page.goto(`${BASE_TELEGRAM_URL}/${pageType}/`, { timeout: 30000 });
 
-      log('Telegram opened.', { success: true });
+      log('Telegram opened.', { success: true, indentSize: 1 });
     } catch (error) {
       log('Failed to visit telegram', { type: 'error', error });
       throw new Error(
@@ -271,15 +271,17 @@ class TelegramScraper {
     key: string,
     timeoutMs: number = DEFAULT_IDB_QUERY_TIMEOUT_MS
   ): Promise<T> {
-    const page = await this.ensureTelegramPage();
     try {
       log(`Querying [${storeName}.${key}] on IDB...`);
 
+      const page = await this.ensureTelegramPage();
+      const db = this._currentDatabase || (await this.getCurrentDB());
+
       return await page.evaluate(
-        async ({ storeName, key, timeoutMs, INDEXED_DB_CONFIG }) => {
+        async ({ storeName, key, timeoutMs, db }) => {
           const abortTimeout = AbortSignal.timeout(timeoutMs);
           return new Promise<T>((resolve, reject) => {
-            const openRequest = indexedDB.open(INDEXED_DB_CONFIG.DATABASE_NAME);
+            const openRequest = indexedDB.open(db);
 
             abortTimeout.addEventListener('abort', () => {
               openRequest.onerror = null;
@@ -306,7 +308,7 @@ class TelegramScraper {
             };
           });
         },
-        { storeName, key, timeoutMs, INDEXED_DB_CONFIG }
+        { storeName, key, timeoutMs, db }
       );
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to query IndexedDB', error));
@@ -849,6 +851,30 @@ class TelegramScraper {
       });
       throw new Error(
         formatErrorMessage('Failed to scroll message panel', error)
+      );
+    }
+  }
+
+  /**
+   * @returns - Current indexedDB database name
+   */
+  private async getCurrentDB(): Promise<string> {
+    try {
+      log('Fetching current IDB database...', { indentSize: 1 });
+
+      const page = await this.ensureTelegramPage('k', true, undefined);
+      const nthAccount = new URL(page.url()).searchParams.get('account') ?? '1';
+
+      log('Fetching IDB database success.', { indentSize: 1, success: true });
+
+      const currentDatabase = `tweb-account-${nthAccount}`;
+      this._currentDatabase = currentDatabase;
+
+      return currentDatabase;
+    } catch (error) {
+      log('Failed to find the default indexedDB', { type: 'error', error });
+      throw new Error(
+        formatErrorMessage('Failed to find the default indexedDB', error)
       );
     }
   }
