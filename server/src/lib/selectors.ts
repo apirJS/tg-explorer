@@ -2,8 +2,7 @@ const selectors = {
   k: {
     home: {
       SEARCH_INPUT: {
-        selector:
-          ".input-search input[type='text']",
+        selector: ".input-search input[type='text']",
         SEARCH_HELPER_LIST: {
           selector:
             '.search-group.search-group-contacts > .chatlist > a > div.dialog-title > div.user-title > span',
@@ -25,7 +24,6 @@ const selectors = {
           ARROW_BUTTON: {
             selector:
               '.new-channel-container > .sidebar-content > button.btn-circle.btn-corner.z-depth-1.rp:has(div.c-ripple,span)',
-              
           },
         },
       },
@@ -44,8 +42,12 @@ const selectors = {
           '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y',
       },
       UPLOAD_MENU_ICON: {
-        selector: ""
-      }
+        selector: 'div.attach-file',
+        UPLOAD_MENU_BUTTON: {
+          selector:
+            'div.attach-file > div.btn-menu > div.btn-menu-item:has(span.btn-menu-item-text):nth-child(2)',
+        },
+      },
     },
   },
 };
