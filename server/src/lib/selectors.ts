@@ -47,6 +47,12 @@ const selectors = {
           selector:
             'div.attach-file > div.btn-menu > div.btn-menu-item:has(span.btn-menu-item-text):nth-child(2)',
         },
+        FILES_INPUT: {
+          selector: 'input[type=file][multiple]',
+        },
+        CONFIRMATION_POPUP_CONTAINER: {
+          selector: 'body > div.popup.popup-send-photo.popup-new-media.active',
+        },
       },
     },
   },

@@ -1,4 +1,4 @@
-import { Browser, LaunchOptions, Page } from 'puppeteer';
+import { Browser, ElementHandle, LaunchOptions, Page } from 'puppeteer';
 import {
   BASE_TELEGRAM_URL,
   DEFAULT_CLICK_DELAY_MS,
@@ -19,6 +19,7 @@ import { ChannelInfo, PageType } from '../lib/types';
 import puppeteer from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import selectors from '../lib/selectors';
+import { t } from 'elysia';
 
 /**
  * TelegramScraper is a singleton class that manages the browser instance
@@ -739,9 +740,9 @@ class TelegramScraper {
   /**
    * Navigates to the existing channel.
    */
-  public async navigateToChannel(): Promise<void> {
+  private async navigateToChannel(): Promise<void> {
     try {
-      log(`Navigating to telegram channel...`);
+      log(`Navigating to telegram channel...`, { indentSize: 1 });
 
       const page = await this.ensureTelegramPage();
       const userId = await this.retrieveUserId();
@@ -757,7 +758,7 @@ class TelegramScraper {
           ?.dispatchEvent(new MouseEvent('mousedown'));
       }, channelInfo.selector);
 
-      log('Navigation success.', { success: true });
+      log('Navigation success.', { success: true, indentSize: 1 });
     } catch (error) {
       log('Failed to navigate to telegram channel', { type: 'error', error });
       throw new Error(
@@ -879,6 +880,63 @@ class TelegramScraper {
     }
   }
 
+  /**
+   * @returns - Returning a page
+   */
+  private async ensureTgChannel(): Promise<Page> {
+    try {
+      log('Ensuring current url...', { indentSize: 1 });
+
+      const page = await this.getFreshPage();
+      const channelId = new URL(page.url()).hash.replace('#-', '');
+      if (!channelId) {
+        await this.navigateToChannel();
+      }
+
+      log('Ensuring success', { success: true, indentSize: 1 });
+      return page;
+    } catch (error) {
+      log('Failed to ensure current url', { type: 'error', error });
+      throw new Error(
+        formatErrorMessage('Failed to ensure current url', error)
+      );
+    }
+  }
+
+  /**
+   * @param { File[] } files - Array of File
+   * @param { boolean } [direct=true] - Whether files are choosen directly or sent via client (UI)
+   * @returns - Returns true when uploads succeed
+   */
+  public async uploadFiles(
+    files: File[],
+    direct: boolean = true
+  ): Promise<boolean> {
+    try {
+      log('Starting to upload files...');
+
+      const page = await this.ensureTgChannel();
+
+      await page
+        .locator(selectors.k.channel.UPLOAD_MENU_ICON.selector)
+        .click({ delay: DEFAULT_CLICK_DELAY_MS });
+      await this.waitForDOMIdle(page);
+
+      await page
+        .locator(
+          selectors.k.channel.UPLOAD_MENU_ICON.UPLOAD_MENU_BUTTON.selector
+        )
+        .click({ delay: DEFAULT_CLICK_DELAY_MS });
+      await this.waitForDOMIdle(page);
+
+      log('Files uploaded', { success: true });
+      return true;
+    } catch (error) {
+      log('Failed to upload files', { type: 'error', error });
+      throw new Error(formatErrorMessage('Failed to upload files', error));
+    }
+  }
+
   /*
    *
    *
@@ -886,11 +944,6 @@ class TelegramScraper {
    *
    *
    */
-
-  async upload() {
-    const page = await this.ensureTelegramPage('k', true, undefined);
-    await this.navigateToChannel();
-  }
 }
 
 export default TelegramScraper;

@@ -8,3 +8,4 @@
 **/*.db
 **/drizzle
 **/migrations
+**/dummies
