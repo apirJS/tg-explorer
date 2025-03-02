@@ -3,9 +3,10 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'crypto';
 import { formatErrorMessage } from '../lib/utils';
+import { Transform } from 'node:stream';
 
-class FileManager {
-  private _CHUNK_SIZE = 524_288_000;
+export class FileManager {
+  private _CHUNK_SIZE = 524_288_000; // 500 MB
 
   constructor() {}
 
@@ -13,32 +14,74 @@ class FileManager {
     filePath: string,
     outputDir: string,
     chunkSize: number = this._CHUNK_SIZE
-  ) {
+  ): Promise<void> {
     try {
-      if (chunkSize > this._CHUNK_SIZE) {
-        throw new Error(
-          "Chunk size can't be bigger than 2GB due to Telegram limit"
-        );
-      }
-
-      const readStream = createReadStream(filePath, {
-        highWaterMark: chunkSize,
-      }) as AsyncIterable<Buffer>;
-      const hash = crypto.createHash('sha256');
       const fileName = path.basename(filePath).slice(0, 246);
-      let index = 0;
+      const hash = crypto.createHash('sha256');
+      let buffer = Buffer.alloc(0);
+      let chunkIndex = 1;
 
-      for await (const chunk of readStream) {
-        const chunkPath = path.join(outputDir, `${fileName}_${index}.part`);
-        const uint8Array = new Uint8Array(chunk);
+      const splitter = new Transform({
+        transform(chunk, _, callback) {
+          (async () => {
+            try {
+              buffer = Buffer.concat([buffer, chunk]);
 
-        await Bun.write(chunkPath, uint8Array);
-        hash.update(uint8Array);
-        index++;
-      }
+              while (buffer.length >= chunkSize) {
+                const chunkToWrite = buffer.subarray(0, chunkSize);
+                buffer = buffer.subarray(chunkSize);
+                const uint8Array = new Uint8Array(chunkToWrite);
+                hash.update(uint8Array);
 
-      const checksum = hash.digest('hex');
-      await Bun.write(path.join(outputDir, `${fileName}.checksum`), checksum);
+                await Bun.write(
+                  path.join(outputDir, `${fileName}.part_${chunkIndex}`),
+                  uint8Array
+                );
+                chunkIndex++;
+              }
+
+              callback(); // All good
+            } catch (err) {
+              callback(err as Error); // Pass error to the stream
+            }
+          })();
+        },
+
+        flush(callback) {
+          (async () => {
+            try {
+              if (buffer.length > 0) {
+                const uint8Array = new Uint8Array(buffer);
+                hash.update(uint8Array);
+                await Bun.write(
+                  path.join(outputDir, `${fileName}.part_${chunkIndex}`),
+                  uint8Array
+                );
+                chunkIndex++;
+              }
+              const checksumPath = path.join(outputDir, `${fileName}.sha256`);
+              const checksum = hash.digest('hex');
+
+              await Bun.write(checksumPath, checksum);
+              callback(); // Stream finish, no more incoming chunk
+            } catch (err) {
+              callback(err as Error);
+            }
+          })();
+        },
+      });
+
+      const readStream = createReadStream(filePath);
+      await new Promise<void>((resolve, reject) => {
+        readStream
+          .pipe(splitter)
+          .on('finish', () => {
+            resolve();
+          })
+          .on('error', (err) => {
+            reject(err);
+          });
+      });
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to split the file', error));
     }
@@ -51,11 +94,14 @@ class FileManager {
   ): Promise<boolean> {
     try {
       const files = (await readdir(inputDir))
-        .filter((fileName) => fileName.includes('.part'))
+        .filter(
+          (fileName) =>
+            fileName.includes(originalFileName) && fileName.includes('.part')
+        )
         .sort((a, b) => {
           return (
-            parseInt(a.split('_').at(-1)!.replace('.part', ''), 10) -
-            parseInt(b.split('_').at(-1)!.replace('.part', ''), 10)
+            parseInt(a.split('.part_').at(-1) ?? '', 10) -
+            parseInt(b.split('.part_').at(-1) ?? '', 10)
           );
         });
 
@@ -68,19 +114,31 @@ class FileManager {
 
       for (const chunkFileName of files) {
         const chunkPath = path.join(inputDir, chunkFileName);
-        const chunk = await Bun.file(chunkPath).arrayBuffer();
-        const buffer = Buffer.from(chunk);
-        const uint8Array = new Uint8Array(buffer);
+        const readStream = createReadStream(chunkPath);
 
-        hash.update(uint8Array);
-        writeStream.write(uint8Array);
+        readStream.on('data', (data) => {
+          const uint8Array = new Uint8Array(data as Buffer);
+          hash.update(uint8Array);
+        });
+
+        readStream.pipe(writeStream, { end: false });
+
+        await new Promise((resolve, reject) => {
+          readStream.on('end', resolve); // chunk fully read
+          readStream.on('error', reject);
+          writeStream.on('error', reject);
+        });
       }
 
       writeStream.end();
+      await new Promise<void>((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+      });
 
       const originalChecksumPath = path.join(
         inputDir,
-        `${originalFileName}.checksum`
+        `${originalFileName}.sha256`
       );
       let originalChecksum = '';
 
