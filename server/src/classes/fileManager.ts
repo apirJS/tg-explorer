@@ -1,93 +1,110 @@
 import { createReadStream, createWriteStream } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
-import crypto from 'crypto';
 import { formatErrorMessage } from '../lib/utils';
-import { Transform } from 'node:stream';
 
 export class FileManager {
   private _CHUNK_SIZE = 524_288_000; // 500 MB
 
   constructor() {}
 
-  private async splitFile(
+  public async splitFile(
     filePath: string,
     outputDir: string,
     chunkSize: number = this._CHUNK_SIZE
-  ): Promise<void> {
+  ): Promise<{
+    files: {
+      path: string;
+      size: number;
+    }[];
+    checksum: {
+      path: string;
+      algorithm: string;
+    };
+    location: string;
+  }> {
     try {
-      const fileName = path.basename(filePath).slice(0, 246);
-      const hash = crypto.createHash('sha256');
-      let buffer = Buffer.alloc(0);
-      let chunkIndex = 1;
+      const result: {
+        files: { path: string; size: number }[];
+        checksum: { path: string; algorithm: string };
+        location: string;
+      } = {
+        files: [],
+        checksum: { path: '', algorithm: 'sha256' },
+        location: outputDir,
+      };
 
-      const splitter = new Transform({
-        transform(chunk, _, callback) {
-          (async () => {
-            try {
-              buffer = Buffer.concat([buffer, chunk]);
+      const fileName = path.basename(filePath);
+      const file = Bun.file(filePath);
+      const readStream = file.stream();
+      const hash = new Bun.CryptoHasher('sha256');
+      const fileSize = file.size;
 
-              while (buffer.length >= chunkSize) {
-                const chunkToWrite = buffer.subarray(0, chunkSize);
-                buffer = buffer.subarray(chunkSize);
-                const uint8Array = new Uint8Array(chunkToWrite);
-                hash.update(uint8Array);
+      let partIndex = 0;
+      let currentFile = path.join(outputDir, `${fileName}.part_${partIndex}`);
+      let currentSize = 0;
+      let totalSize = 0;
+      let writer = Bun.file(currentFile).writer();
 
-                await Bun.write(
-                  path.join(outputDir, `${fileName}.part_${chunkIndex}`),
-                  uint8Array
-                );
-                chunkIndex++;
-              }
+      for await (const chunk of readStream) {
+        let chunkOffset = 0;
+        hash.update(chunk);
 
-              callback(); // All good
-            } catch (err) {
-              callback(err as Error); // Pass error to the stream
+        while (chunkOffset < chunk.length) {
+          let spaceLeft = chunkSize - currentSize;
+          let bytesToWrite = Math.min(spaceLeft, chunk.length - chunkOffset);
+
+          writer.write(
+            chunk.subarray(chunkOffset, chunkOffset + bytesToWrite)
+          );
+          currentSize += bytesToWrite;
+          totalSize += bytesToWrite;
+          chunkOffset += bytesToWrite;
+
+          if (currentSize >= chunkSize) {
+            await writer.flush();
+            await writer.end();
+            result.files.push({ path: currentFile, size: currentSize });
+            console.log(
+              `Finished writing ${currentFile} (${currentSize} bytes)`
+            );
+
+            if (totalSize < fileSize) {
+              partIndex++;
+              currentFile = path.join(
+                outputDir,
+                `${fileName}.part_${partIndex}`
+              );
+              writer = Bun.file(currentFile).writer();
+              currentSize = 0;
             }
-          })();
-        },
+          }
+        }
+      }
 
-        flush(callback) {
-          (async () => {
-            try {
-              if (buffer.length > 0) {
-                const uint8Array = new Uint8Array(buffer);
-                hash.update(uint8Array);
-                await Bun.write(
-                  path.join(outputDir, `${fileName}.part_${chunkIndex}`),
-                  uint8Array
-                );
-                chunkIndex++;
-              }
-              const checksumPath = path.join(outputDir, `${fileName}.sha256`);
-              const checksum = hash.digest('hex');
+      if (currentSize > 0) {
+        await writer.flush();
+        await writer.end();
+        result.files.push({ path: currentFile, size: currentSize });
+        console.log(
+          `Finished last part: ${currentFile} (${currentSize} bytes)`
+        );
+      }
 
-              await Bun.write(checksumPath, checksum);
-              callback(); // Stream finish, no more incoming chunk
-            } catch (err) {
-              callback(err as Error);
-            }
-          })();
-        },
-      });
+      const checksumPath = path.join(outputDir, `${fileName}.sha256`);
+      const checksum = hash.digest('hex');
 
-      const readStream = createReadStream(filePath);
-      await new Promise<void>((resolve, reject) => {
-        readStream
-          .pipe(splitter)
-          .on('finish', () => {
-            resolve();
-          })
-          .on('error', (err) => {
-            reject(err);
-          });
-      });
+      await Bun.write(checksumPath, checksum);
+
+      result.checksum = { path: checksumPath, algorithm: 'sha256' };
+      result.location = outputDir;
+      return result;
     } catch (error) {
       throw new Error(formatErrorMessage('Failed to split the file', error));
     }
   }
 
-  private async mergeFile(
+  public async mergeFile(
     originalFileName: string,
     inputDir: string,
     outputFilePath: string
@@ -110,7 +127,7 @@ export class FileManager {
       }
 
       const writeStream = createWriteStream(outputFilePath);
-      const hash = crypto.createHash('sha256');
+      const hash = new Bun.CryptoHasher('sha256');
 
       for (const chunkFileName of files) {
         const chunkPath = path.join(inputDir, chunkFileName);
