@@ -8,7 +8,12 @@ EXPERIMENT,TEST,ETC.
 */
 
 const fm = new FileManager();
-await fm.splitFile(
-  './src/dummies/(Reup) NodeJS-20250206T123910Z-001.zip',
-  './src/dummies/'
+// await fm.splitFile(
+//   './src/dummies/(Reup) NodeJS-20250206T123910Z-001.zip',
+//   './src/dummies/'
+// );
+await fm.mergeFile(
+  '(Reup) NodeJS-20250206T123910Z-001.zip',
+  './src/dummies/',
+  './src/dummies/(Reup) NodeJS-20250206T123910Z-002.zip'
 );
