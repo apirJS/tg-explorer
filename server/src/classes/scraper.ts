@@ -944,6 +944,41 @@ class TelegramScraper {
    *
    *
    */
+
+  async upload() {
+    const page = await this.ensureTgChannel();
+
+    await this.waitForDOMIdle(page);
+    await page
+      .locator(selectors.k.channel.UPLOAD_MENU_ICON.selector)
+      .click({ delay: DEFAULT_CLICK_DELAY_MS });
+
+    await this.waitForDOMIdle(page);
+    await page
+      .locator(selectors.k.channel.UPLOAD_MENU_ICON.UPLOAD_MENU_BUTTON.selector)
+      .click({ delay: DEFAULT_CLICK_DELAY_MS });
+
+    await this.waitForDOMIdle(page);
+    const inputElement = await page.$(
+      selectors.k.channel.UPLOAD_MENU_ICON.FILES_INPUT.selector
+    );
+
+    if (!inputElement) {
+      throw new Error('Input file element is missing');
+    }
+
+    await (inputElement as ElementHandle<HTMLInputElement>).uploadFile(
+      path.join(__dirname, '../../files/imsakiyah.pdf')
+    );
+
+    await this.waitForDOMIdle(page);
+    await page
+      .locator(
+        selectors.k.channel.UPLOAD_MENU_ICON.CONFIRMATION_POPUP_CONTAINER
+          .FILES_CONTAINER.SEND_FILES_BUTTON.selector
+      )
+      .click({ delay: DEFAULT_CLICK_DELAY_MS });
+  }
 }
 
 export default TelegramScraper;

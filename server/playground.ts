@@ -7,13 +7,5 @@ A PLACE FOR PLAYING AROUND WITH CODE;
 EXPERIMENT,TEST,ETC.
 */
 
-const fm = new FileManager();
-// await fm.splitFile(
-//   './src/dummies/(Reup) NodeJS-20250206T123910Z-001.zip',
-//   './src/dummies/'
-// );
-await fm.mergeFile(
-  '(Reup) NodeJS-20250206T123910Z-001.zip',
-  './src/dummies/',
-  './src/dummies/(Reup) NodeJS-20250206T123910Z-002.zip'
-);
+const s = await TelegramScraper.createInstance({ headless: false })
+await s.upload()

@@ -52,6 +52,14 @@ const selectors = {
         },
         CONFIRMATION_POPUP_CONTAINER: {
           selector: 'body > div.popup.popup-send-photo.popup-new-media.active',
+          FILES_CONTAINER: {
+            selector:
+              'body > div.popup.popup-send-photo.popup-new-media.active > div > div.popup-body > div > div.popup-photo',
+            SEND_FILES_BUTTON: {
+              selector:
+                'body > div.popup.popup-send-photo.popup-new-media.active > div > div.popup-input-container > button',
+            },
+          },
         },
       },
     },
