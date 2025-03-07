@@ -29,6 +29,10 @@ const selectors = {
       },
     },
     channel: {
+      SCROLL_TO_BOTTOM: {
+        selector:
+          '#column-center > div > div > div.chat-input.chat-input-main > div > button.btn-circle.btn-corner.z-depth-1.bubbles-corner-button.chat-secondary-button.bubbles-go-down.rp.is-broadcast',
+      },
       MESSAGES: {
         selector: 'section.bubbles-date-group > div.bubbles-group > div',
         isNodeList: true,

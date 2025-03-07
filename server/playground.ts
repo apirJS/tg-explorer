@@ -7,5 +7,6 @@ A PLACE FOR PLAYING AROUND WITH CODE;
 EXPERIMENT,TEST,ETC.
 */
 
-const s = await TelegramScraper.createInstance({ headless: false })
-await s.upload()
+const s = await TelegramScraper.createInstance({ headless: false });
+await s.uploadFiles();
+

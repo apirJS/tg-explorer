@@ -3,7 +3,8 @@ import { LogOptions, PageType } from './types';
 import { BASE_TELEGRAM_URL } from './const';
 import type { EnvirontmentVariables } from './global.types';
 import chalk from 'chalk';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
 
 /**
  * Disables animations on the provided Puppeteer page.
@@ -125,4 +126,10 @@ export function log(message: string, options: LogOptions = {}): void {
       break;
     }
   }
+}
+
+export async function multerDirEmpty(): Promise<boolean> {
+  const dir = path.resolve(__dirname, '../../uploads');
+  const files = await readdir(dir);
+  return files.length === 0;
 }
