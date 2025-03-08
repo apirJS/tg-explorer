@@ -3,7 +3,7 @@ import { LogOptions, PageType } from './types';
 import { BASE_TELEGRAM_URL } from './const';
 import type { EnvirontmentVariables } from './global.types';
 import chalk from 'chalk';
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 /**
@@ -128,6 +128,10 @@ export function log(message: string, options: LogOptions = {}): void {
   }
 }
 
+/**
+ *
+ * @returns - Return true if directory is empty
+ */
 export async function multerDirEmpty(): Promise<boolean> {
   const dir = path.resolve(__dirname, '../../uploads');
   const files = await readdir(dir);

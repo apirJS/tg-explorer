@@ -896,7 +896,7 @@ class TelegramScraper {
       await page
         .locator(selectors.k.channel.SCROLL_TO_BOTTOM.selector)
         .click({ delay: DEFAULT_CLICK_DELAY_MS });
-        
+
       log('Ensuring success', { success: true, indentSize: 1 });
       return page;
     } catch (error) {
@@ -916,25 +916,49 @@ class TelegramScraper {
    */
 
   /**
-   *
+   * Will return all the loaded messages
+   */
+  private async getMessages(): Promise<Map<string, HTMLDivElement>> {
+    try {
+      const map = new Map<string, HTMLDivElement>();
+      const page = await this.ensureTgChannel();
+      await page.$$eval(selectors.k.channel.MESSAGES.selector, (messages) => {
+        messages.forEach((message) => {
+          map.set(
+            (message as HTMLDivElement).dataset.mid!,
+            message as HTMLDivElement
+          );
+        });
+      });
+
+      return map;
+    } catch (error) {
+      log(`Failed to get the last message group`, { type: 'error', error });
+      throw new Error(
+        formatErrorMessage('Failed to get the last message group', error)
+      );
+    }
+  }
+
+  /**
+   * Will return a map that contains Map<message id, message element>.
+   * Each element contains file(s)
    * @param {string} multerDir - Multer's file directory
    * @returns
    */
-  async uploadFiles(
+  public async uploadFiles(
     multerDir: string = path.resolve(__dirname, '../../uploads')
-  ): Promise<boolean> {
+  ): Promise<Map<string, HTMLDivElement>> {
     try {
       log(`Uploading files...`);
 
       if (await multerDirEmpty()) {
-        log(`Failed to upload files: Uploads directory was empty`, {
-          success: false,
-        });
-        return false;
+        throw new Error('No files found inside uploads folder');
       }
 
       const files = await readdir(multerDir);
       const page = await this.ensureTgChannel();
+      const previousMessages = await this.getMessages();
 
       await this.waitForDOMIdle(page);
       await page
@@ -963,6 +987,20 @@ class TelegramScraper {
         );
       }
 
+      // Check if there is no new files
+      const currentMessages = await this.getMessages();
+      if (currentMessages.size === previousMessages.size) {
+        throw new Error('No new messages detected');
+      }
+
+      const newMessages = new Map<string, HTMLDivElement>();
+      currentMessages.keys().forEach((key) => {
+        const newMessage = currentMessages.get(key);
+        if (!previousMessages.has(key) && newMessage) {
+          newMessages.set(key, newMessage);
+        }
+      });
+
       await this.waitForDOMIdle(page);
       await page
         .locator(
@@ -972,7 +1010,7 @@ class TelegramScraper {
         .click({ delay: DEFAULT_CLICK_DELAY_MS });
 
       log(`Uploads success`, { success: true });
-      return true;
+      return newMessages;
     } catch (error) {
       log(`Failed to upload files`, { type: 'error', error });
       throw new Error(formatErrorMessage('Failed to upload files', error));

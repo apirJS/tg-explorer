@@ -34,12 +34,7 @@ const selectors = {
           '#column-center > div > div > div.chat-input.chat-input-main > div > button.btn-circle.btn-corner.z-depth-1.bubbles-corner-button.chat-secondary-button.bubbles-go-down.rp.is-broadcast',
       },
       MESSAGES: {
-        selector: 'section.bubbles-date-group > div.bubbles-group > div',
-        isNodeList: true,
-      },
-      FIRST_CHAT_BUBBLE_GROUP: {
-        selector:
-          '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y > div > section > div.bubbles-group.bubbles-group-first',
+        selector: 'div.document-message[data-mid]',
       },
       SCROLLABLE: {
         selector:
@@ -65,6 +60,13 @@ const selectors = {
             },
           },
         },
+      },
+      FIRST_CHAT_BUBBLE_GROUP: {
+        selector:
+          '#column-center > div > div > div.bubbles.is-chat-input-hidden.has-groups.has-sticky-dates > div.scrollable.scrollable-y > div > section > div.bubbles-group.bubbles-group-first',
+      },
+      LAST_CHAT_BUBBLE_GROUP: {
+        selector: 'div.bubbles-group.bubbles-group-last',
       },
     },
   },
